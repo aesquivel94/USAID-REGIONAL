@@ -29,7 +29,7 @@ library(glue)
 # By one year, this function organize data set like Lat, Long and SST.
 
 add_long <- function(data){
-  data <- SST_filter %>%
+  data <- data %>%
     filter(row_number() %in% SST_length[1]:(SST_length[2]-1))
   
   Long <- data %>%
@@ -52,24 +52,36 @@ add_long <- function(data){
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
 # Section 2. 
 
-# Building one sample layer. 
-one_spread_layer <- function(data, percent){
+# This function do the row sample 
+do_sample <- function(data, percent){
   # 1. First step do the function by one layer... 
   # Example for one layer
-  # data <- SST_by_id  %>%
+  # data <- stack_l  %>%
   #   filter(row_number() == 1) %>%
   #   select(new_data) %>%
   #   unnest
-
+  
   # 2. Which rows are different to NA data. 
   try_do_this <- which(!is.na(data))
   
   # 3. Sampling rows. 
   rows <- sample(try_do_this, length(try_do_this)*percent)
   
+return(rows)}
+
+
+# Building one sample layer. 
+one_spread_layer <- function(data, row_positions){
+  # 1. First step do the function by one layer... 
+  # Example for one layer
+  # data <- SST_by_id  %>%
+  #   filter(row_number() == 1) %>%
+  #   select(new_data) %>%
+  #   unnest
+  
   # In this part we do the sampling and spread the date for do one layer. 
   spread_layer <- data %>% 
-    mutate(condition = ifelse(row_number() %in% rows, SST, NA)) %>% 
+    mutate(condition = ifelse(row_number() %in% row_positions, SST, NA)) %>% 
     mutate(condition = ifelse(is.na(condition), -999, condition)) %>% 
     dplyr::select(-SST) %>% 
     spread(Long, condition)  %>%
@@ -126,7 +138,19 @@ SST_by_id <- SST_filter %>%
   nest(-id) %>%
   mutate(new_data = purrr::map(.x = data, .f = add_long)) %>%
   select(-data)
-tictoc::toc() # 4.57 sec.
+tictoc::toc() # 5.65 sec.
+
+
+
+
+
+
+# SST_filter %>%
+#   tbl_df()  %>%
+#   mutate(id = rep(1982:2015, each = SST_length[2] - SST_length[1])) 
+  
+
+
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -164,26 +188,22 @@ SST_by_id <- SST_by_id %>%
   right_join(CPT_dates, ., by = 'id')
   
   
-  
 
+
+row_positions <- SST_by_id %>% 
+  dplyr::select(new_data) %>% 
+  filter(row_number() == 1) %>% 
+  unnest %>% 
+  do_sample(., percent = percent)
+
+  
 tictoc::tic()
 test_row_1 <- SST_by_id %>% 
-  mutate(spread_data = purrr::map(.x = new_data, .f = one_spread_layer, percent))  %>% 
+  mutate(spread_data = purrr::map(.x = new_data, .f = one_spread_layer, row_positions))  %>% 
   dplyr::select(-new_data)
-tictoc::toc() # 11.09 
+tictoc::toc() # 10.39 
 
 
-# test_row_1 %>% 
-#   filter(row_number() == 1) %>% 
-#   dplyr::select(spread_data) %>% 
-#   unnest %>% 
-#   View
-
-
-
-
-# cpt_field <- SST %>%
-#   filter(grepl("cpt:field", V1))  
 
 
 ## x without year
@@ -231,6 +251,21 @@ write_cpt <- function(x, file){
 }
 
 write_cpt(x = test_row_1, file = 'p.txt')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=
 
 
 
