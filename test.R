@@ -161,6 +161,131 @@ write_cpt <- function(x, file){
 # Run CPT from R console (in this case for ERSST). 
 
 
+# x <- SST file with path. 
+# y <- Stations file with path. 
+# i_fores <- targed season... (really i'm not sure about this parameter). 
+# path_run <-  path where the CPT executable is saved.
+# path_out <-  path where we will save the results after run CPT. 
+
+
+# despues de echo 9 y 1
+# echo 532
+# echo 1982
+# echo 2015
+# echo N
+# echo 2
+
+run_cpt_basic <- function(x, run,  y,  i_fores,  path_run,  path_out){
+  
+  GI <- paste0(path_out,"GI", run,".txt")
+  prob <- paste0(path_out,"prob", run,".txt")
+  
+  cmd <- "@echo off
+  
+  (
+  echo 611
+  echo 1
+  echo %path_x% 
+  echo 30
+  echo -30
+  echo 0
+  echo 359
+  echo 1
+  echo 10 
+  echo 2
+  echo %path_y%
+  echo %i_for% 
+  echo 3
+  echo 3
+  echo 17
+  echo 13
+  echo -90
+  echo -83
+  echo 1
+  echo 10
+  echo 1
+  echo 5
+  echo 9
+  echo 1
+  echo 7
+  echo 34
+  echo 554
+  echo 2
+  echo 541
+  echo 112
+  echo %path_GI%
+  echo 311
+  echo 451
+  echo 452
+  echo 454
+  echo 455
+  echo 111
+  echo 501
+  echo %path_prob%
+  echo 0
+  echo 0
+  ) | CPT_batch.exe"
+
+
+cmd<-gsub("%path_x%",x,cmd)
+cmd<-gsub("%path_y%",y,cmd)
+cmd<-gsub("%path_GI%",GI,cmd)
+cmd<-gsub("%path_prob%",prob,cmd)
+
+cmd<-gsub("%i_for%",i_fores,cmd)
+
+write(cmd, path_run)
+system(path_run, ignore.stdout = T, show.output.on.console = T)
+
+#  if(file.exists(paths = paste0(path_run, "text.bat")) == TRUE){
+#    file.remove(paste0(path_run, "text.bat")) }
+
+}
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Section 4. Run CPT 100 times... with diferent files. 
+# =-=-=
+
+# This function save one SST sample file. 
+masive_runs <- function( run, data_by_id, path){
+  
+  # data_by_id <- SST_by_id
+  
+  row_positions <- data_by_id %>%
+    dplyr::select(new_data) %>%
+    filter(row_number() == 1) %>%
+    unnest %>%
+    do_sample(., percent = percent)
+  
+  
+  SST_sample <- data_by_id %>%
+    mutate(spread_data = purrr::map(.x = new_data, .f = one_spread_layer, row_positions))  %>%
+    dplyr::select(-new_data)
+  
+  
+  write_cpt(x = SST_sample, file = paste0(path, 'run_', as.numeric(run) ,'.txt') ) 
+}
+
+
+# This function runs with only one y file... if we have run with several y,  we will need modify it. 
+run_cpt_sample <- function(run, y, data_by_id, path, i_fores){
+  
+  path_out <- paste0(path, 'GI_runs/')
+  
+  if(dir.exists(path_out) == FALSE){dir.create(path_out)}else{print('ok')}
+  
+  purrr::map(run, .f = masive_runs, data_by_id = data_by_id)
+  
+  x <- list.files(path = path,  pattern = '.txt$', full.names = TRUE) 
+  
+  path_run <- paste0(path ,'test.bat')
+  
+  purrr::map2(.x = x, .y = run, .f = run_cpt_basic, y = y, i_fores = i_fores, path_run = path_run ,  path_out = path_out)
+}
+
 
 
 
@@ -231,26 +356,22 @@ CPT_dates <- SST[1, -1][which(!is.na(SST[1, -1]))] %>%
 # Paste real dates from CPT
 SST_by_id <- SST_by_id %>% 
   right_join(CPT_dates, ., by = 'id')
-  
-  
 
 
-row_positions <- SST_by_id %>% 
-  dplyr::select(new_data) %>% 
-  filter(row_number() == 1) %>% 
-  unnest %>% 
-  do_sample(., percent = percent)
-
-  
-tictoc::tic()
-SST_sample <- SST_by_id %>% 
-  mutate(spread_data = purrr::map(.x = new_data, .f = one_spread_layer, row_positions))  %>% 
-  dplyr::select(-new_data)
-tictoc::toc() # 10.39 
-
-
-
-write_cpt(x = SST_sample, file = 'SST_runs/run_1.txt')
+# row_positions <- SST_by_id %>% 
+#   dplyr::select(new_data) %>% 
+#   filter(row_number() == 1) %>% 
+#   unnest %>% 
+#   do_sample(., percent = percent)
+# 
+#   
+# tictoc::tic()
+# SST_sample <- SST_by_id %>% 
+#   mutate(spread_data = purrr::map(.x = new_data, .f = one_spread_layer, row_positions))  %>% 
+#   dplyr::select(-new_data)
+# tictoc::toc() # 10.39 
+# 
+# write_cpt(x = SST_sample, file = 'SST_runs/run_1.txt')
 
 
 
@@ -259,95 +380,45 @@ write_cpt(x = SST_sample, file = 'SST_runs/run_1.txt')
 # Section 3. Run CPT by one layer. 
 # =-=-=
 
-# x <- SST file with path. 
-# y <- Stations file with path. 
-# i_fores <- targed season... (really i'm not sure about this parameter). 
-# path_run <-  path where the CPT executable is saved.
-# path_out <-  path where we will save the results after run CPT. 
+# x <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/run_1.txt'
+# y <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/honduras_chirps_data.txt'
+# path_out <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/GI_runs/'
+# path_run <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/test.bat'
+# i_fores <- 3
+# 
+# run_cpt_basic(x,  y,  i_fores,  path_run,  path_out, run )
 
 
-# despues de echo 9 y 1
-# echo 532
-# echo 1982
-# echo 2015
-# echo N
-# echo 2
 
-run_cpt <- function(x,  y,  i_fores,  path_run,  path_out){
-  
-  GI <- paste0(path_out,"GI.txt")
-  prob <- paste0(path_out,"prob.txt")
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Section 4. Run CPT 100 times... with diferent files. 
+# =-=-=
 
-  cmd <- "@echo off
-  
-  (
-  echo 611
-  echo 1
-  echo %path_x% 
-  echo 30
-  echo -30
-  echo 0
-  echo 359
-  echo 1
-  echo 10 
-  echo 2
-  echo %path_y%
-  echo %i_for% 
-  echo 3
-  echo 3
-  echo 17
-  echo 13
-  echo -90
-  echo -83
-  echo 1
-  echo 10
-  echo 1
-  echo 5
-  echo 9
-  echo 1
-  echo 7
-  echo 34
-  echo 554
-  echo 2
-  echo 541
-  echo 112
-  echo %path_GI%
-  echo 311
-  echo 451
-  echo 452
-  echo 454
-  echo 455
-  echo 111
-  echo 501
-  echo %path_prob%
-  echo 0
-  echo 0
-  ) | CPT_batch.exe"
-
-
-cmd<-gsub("%path_x%",x,cmd)
-cmd<-gsub("%path_y%",y,cmd)
-cmd<-gsub("%path_GI%",GI,cmd)
-cmd<-gsub("%path_prob%",prob,cmd)
-
-cmd<-gsub("%i_for%",i_fores,cmd)
-
-write(cmd, path_run)
-system(path_run, ignore.stdout = T, show.output.on.console = T)
-
-#  if(file.exists(paths = paste0(path_run, "text.bat")) == TRUE){
-#    file.remove(paste0(path_run, "text.bat")) }
-
-}
-
-
-x <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/run_1.txt'
 y <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/honduras_chirps_data.txt'
-path_out <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/GI_runs/'
-path_run <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/test.bat'
-i_fores <- 3
+path <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/'
 
-run_cpt(x,  y,  i_fores,  path_run,  path_out)
+tictoc::tic()
+run_cpt_sample(run = 1:5, y = y, data_by_id = SST_by_id, path = path, i_fores = 3) 
+tictoc::toc()
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Section 5. Reading G.I. files and construct histogram. 
+# =-=-=
+
+
+list.files(path = paste0(path, 'GI_runs'), pattern = 'GI', full.names =  TRUE)[1]
+
+
+
+
+
+
+
+GI1 <- read_table2("SST_runs/GI_runs/GI1.txt", skip = 5) %>% 
+  tail(n = 1L) %>% 
+  .[, -(1:4)]
 
 
 
