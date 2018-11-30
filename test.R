@@ -51,6 +51,7 @@ add_long <- function(data){
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
 # Section 2. 
+# SST sample file. 
 
 # This function do the row sample 
 do_sample <- function(data, percent){
@@ -101,10 +102,63 @@ one_spread_layer <- function(data, row_positions){
 return(spread_layer)}
 
 
-# Create SST's CPT file. 
+## =-=-=-=-=-=-
+# Create SST's CPT file, for that we need 3 functions. 
+
+
+## This function do inctial rows (URL, field, first year), and save the first layer. 
+write_cpt_head <- function(x, file){
+  
+  # x <- SST_sample
+  x <- dplyr::select(x, -id, -date) %>% 
+    filter(row_number() == 1) %>% 
+    unnest
+  
+  sink(file = file)
+  cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
+  cat('cpt:nfields=1', sep = '\n')
+  cat('cpt:field=ssta, cpt:T=1982-03/05, cpt:nrow=61, cpt:ncol=360, cpt:row=Y, cpt:col=X, cpt:units=Kelvin_scale, cpt:missing=-999', sep = '\n')
+  cat(write.table(x, sep = '\t', col.names = FALSE, row.names = FALSE, na = ""))
+  sink()
+  
+}
+
+## This function open the last file and save the following layers with its own dates and save final file. 
+write_cpt_body <- function(x, file){
+  
+  # x <- SST_sample
+  x <- dplyr::select(x, -id) %>%
+    filter(row_number() > 1) %>%
+    unnest()
+  
+  x <- split(x,x$date)
+  year <- names(x)
+  
+  purrr::map2(.x = x, .y = year, .f = function(.x, .y){
+    
+    .x <- dplyr::select(.x, -date)
+    sink(file = file, append = T)
+    cat(glue('cpt:T={.y}'), sep = '\n')
+    cat(write.table(.x, sep = '\t', col.names = FALSE, row.names = FALSE, na = ""))
+    sink()
+  })
+  
+}
+
+##  This funtion combine write_cpt head  and body and save the final file. 
+write_cpt <- function(x, file){
+  
+  write_cpt_head(x, file)
+  write_cpt_body(x, file)
+}
 
 
 
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
+# Section 3. 
+# Run CPT from R console (in this case for ERSST). 
 
 
 
@@ -144,24 +198,15 @@ tictoc::toc() # 5.65 sec.
 
 
 
-
-# SST_filter %>%
-#   tbl_df()  %>%
-#   mutate(id = rep(1982:2015, each = SST_length[2] - SST_length[1])) 
-  
-
-
-
-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Section 2. Sampling SST and convert to CPT format.  
-# =-=-= Proof...
+# =-=-=
 
 
 # =-=-=-=-=-=-=-=
 # First step to do Resampling and CPT files. 
 
-# i guess is necesary to create a Output folder and clean the files... 
+# i guess is necesary to create a path_out folder and clean the files... 
 # The other thing is necesary errase that files. 
 # One posibility is run CPT just after create one file. 
 # But in this moment isn't necesary that... it's most important in secction 3. 
@@ -198,74 +243,111 @@ row_positions <- SST_by_id %>%
 
   
 tictoc::tic()
-test_row_1 <- SST_by_id %>% 
+SST_sample <- SST_by_id %>% 
   mutate(spread_data = purrr::map(.x = new_data, .f = one_spread_layer, row_positions))  %>% 
   dplyr::select(-new_data)
 tictoc::toc() # 10.39 
 
 
 
+write_cpt(x = SST_sample, file = 'SST_runs/run_1.txt')
 
-## x without year
-write_cpt_head <- function(x, file){
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Section 3. Run CPT by one layer. 
+# =-=-=
+
+# x <- SST file with path. 
+# y <- Stations file with path. 
+# i_fores <- targed season... (really i'm not sure about this parameter). 
+# path_run <-  path where the CPT executable is saved.
+# path_out <-  path where we will save the results after run CPT. 
+
+
+# despues de echo 9 y 1
+# echo 532
+# echo 1982
+# echo 2015
+# echo N
+# echo 2
+
+run_cpt <- function(x,  y,  i_fores,  path_run,  path_out){
   
-  # x <- test_row_1
-  x <- dplyr::select(x, -id, -date) %>% 
-    filter(row_number() == 1) %>% 
-    unnest
+  GI <- paste0(path_out,"GI.txt")
+  prob <- paste0(path_out,"prob.txt")
+
+  cmd <- "@echo off
   
-  sink(file = "p.txt")
-  cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
-  cat('cpt:nfields=1', sep = '\n')
-  cat('cpt:field=ssta, cpt:T=1982-03/05, cpt:nrow=61, cpt:ncol=360, cpt:row=Y, cpt:col=X, cpt:units=Kelvin_scale, cpt:missing=-999', sep = '\n')
-  cat(write.table(x, sep = '\t', col.names = FALSE, row.names = FALSE, na = ""))
-  sink()
-   
+  (
+  echo 611
+  echo 1
+  echo %path_x% 
+  echo 30
+  echo -30
+  echo 0
+  echo 359
+  echo 1
+  echo 10 
+  echo 2
+  echo %path_y%
+  echo %i_for% 
+  echo 3
+  echo 3
+  echo 17
+  echo 13
+  echo -90
+  echo -83
+  echo 1
+  echo 10
+  echo 1
+  echo 5
+  echo 9
+  echo 1
+  echo 7
+  echo 34
+  echo 554
+  echo 2
+  echo 541
+  echo 112
+  echo %path_GI%
+  echo 311
+  echo 451
+  echo 452
+  echo 454
+  echo 455
+  echo 111
+  echo 501
+  echo %path_prob%
+  echo 0
+  echo 0
+  ) | CPT_batch.exe"
+
+
+cmd<-gsub("%path_x%",x,cmd)
+cmd<-gsub("%path_y%",y,cmd)
+cmd<-gsub("%path_GI%",GI,cmd)
+cmd<-gsub("%path_prob%",prob,cmd)
+
+cmd<-gsub("%i_for%",i_fores,cmd)
+
+write(cmd, path_run)
+system(path_run, ignore.stdout = T, show.output.on.console = T)
+
+#  if(file.exists(paths = paste0(path_run, "text.bat")) == TRUE){
+#    file.remove(paste0(path_run, "text.bat")) }
+
 }
 
-write_cpt_body <- function(x, file){
-  
-  # x <- test_row_1
-  x <- dplyr::select(x, -id) %>%
-    filter(row_number() > 1) %>%
-    unnest()
-  
-  x <- split(x,x$date)
-  year <- names(x)
-  
-  purrr::map2(.x = x, .y = year, .f = function(.x, .y){
-    
-    .x <- dplyr::select(.x, -date)
-    sink(file = "p.txt", append = T)
-    cat(glue('cpt:T={.y}'), sep = '\n')
-    cat(write.table(.x, sep = '\t', col.names = FALSE, row.names = FALSE, na = ""))
-    sink()
-  })
- 
-}
 
-write_cpt <- function(x, file){
-  
-  write_cpt_head(x, file)
-  write_cpt_body(x, file)
-}
+x <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/run_1.txt'
+y <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/honduras_chirps_data.txt'
+path_out <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/GI_runs/'
+path_run <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/test.bat'
+i_fores <- 3
 
-write_cpt(x = test_row_1, file = 'p.txt')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# =-=-=-=-=-=-=-=-=-=-=
+run_cpt(x,  y,  i_fores,  path_run,  path_out)
 
 
 
