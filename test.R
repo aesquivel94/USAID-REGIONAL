@@ -167,61 +167,47 @@ write_cpt <- function(x, file){
 # path_run <-  path where the CPT executable is saved.
 # path_out <-  path where we will save the results after run CPT. 
 
-
-# despues de echo 9 y 1
-# echo 532
-# echo 1982
-# echo 2015
-# echo N
-# echo 2
-
-run_cpt_basic <- function(x, run,  y,  i_fores,  path_run,  path_out){
+run_cpt_basic <- function(x, run,  y,  path_run,  path_out){
   
   GI <- paste0(path_out,"GI", run,".txt")
-  prob <- paste0(path_out,"prob", run,".txt")
+  # prob <- paste0(path_out,"prob", run,".txt")
   
   cmd <- "@echo off
   
   (
   echo 611
+  echo 545
   echo 1
   echo %path_x% 
-  echo 30
-  echo -30
-  echo 0
-  echo 359
+  echo /
+  echo /
+  echo /
+  echo /
   echo 1
-  echo 10 
+  echo 10
   echo 2
   echo %path_y%
-  echo %i_for% 
-  echo 3
-  echo 3
-  echo 17
-  echo 13
-  echo -90
-  echo -83
+  echo /
+  echo /
+  echo /
+  echo /
   echo 1
   echo 10
   echo 1
   echo 5
   echo 9
   echo 1
-  echo 7
-  echo 34
+  echo 532
+  echo /
+  echo /
+  echo N
+  echo 2
   echo 554
   echo 2
   echo 541
-  echo 112
+  echo 112  
   echo %path_GI%
   echo 311
-  echo 451
-  echo 452
-  echo 454
-  echo 455
-  echo 111
-  echo 501
-  echo %path_prob%
   echo 0
   echo 0
   ) | CPT_batch.exe"
@@ -230,9 +216,6 @@ run_cpt_basic <- function(x, run,  y,  i_fores,  path_run,  path_out){
 cmd<-gsub("%path_x%",x,cmd)
 cmd<-gsub("%path_y%",y,cmd)
 cmd<-gsub("%path_GI%",GI,cmd)
-cmd<-gsub("%path_prob%",prob,cmd)
-
-cmd<-gsub("%i_for%",i_fores,cmd)
 
 write(cmd, path_run)
 system(path_run, ignore.stdout = T, show.output.on.console = T)
@@ -241,6 +224,13 @@ system(path_run, ignore.stdout = T, show.output.on.console = T)
 #    file.remove(paste0(path_run, "text.bat")) }
 
 }
+
+# Original run with predictor area. 
+# run_cpt_basic(x = 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/Feb_Mar-Apr-May_0.8.txt',
+#               y = 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/honduras_chirps_data.txt',
+#               path_run = 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/test.bat',
+#               path_out = 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/',
+#               run = 'sd')
 
 
 
@@ -400,6 +390,15 @@ SST_by_id <- SST_by_id %>%
 # run_cpt_basic(x,  y,  i_fores,  path_run,  path_out, run )
 
 
+# run_cpt_basic(x = 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/Feb_Mar-Apr-May_0.8.txt',  
+#               y = 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/honduras_chirps_data.txt',  
+#               i_fores = 3,  
+#               path_run = 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/test.bat',  
+#               path_out = 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/', 
+#               run = 'sd')
+
+
+
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Section 4. Run CPT 100 times... with diferent files. 
@@ -444,4 +443,22 @@ GI %>%
   geom_density(fill = 'lightskyblue', alpha = 0.4) + 
   geom_vline(xintercept = real_GI$Index_1, colour = 'lightskyblue', linetype="dashed",  size=2) + 
   theme_bw() 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
