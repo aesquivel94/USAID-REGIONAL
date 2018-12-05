@@ -277,7 +277,7 @@ run_cpt_sample <- function(run, y, data_by_id, path, i_fores){
   
   if(dir.exists(path_out) == FALSE){dir.create(path_out)}else{print('ok')}
   
-  purrr::map(run, .f = masive_runs, data_by_id = data_by_id)
+  purrr::map(run, .f = masive_runs, data_by_id = data_by_id, path = path)
   
   x <- list.files(path = path,  pattern = '.txt$', full.names = TRUE) 
   
@@ -286,6 +286,17 @@ run_cpt_sample <- function(run, y, data_by_id, path, i_fores){
   purrr::map2(.x = x, .y = run, .f = run_cpt_basic, y = y, i_fores = i_fores, path_run = path_run ,  path_out = path_out)
 }
 
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Section 5. Reading G.I. files and construct histogram. 
+# =-=-=
+
+#  This function do a table with de GI. 
+GI_read <- function(route){
+  GI <- read_table2(route , skip = 5) %>% 
+    tail(n = 1L) %>% 
+    .[, -(1:4)] 
+  return(GI)}
 
 
 
@@ -397,29 +408,40 @@ SST_by_id <- SST_by_id %>%
 y <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/honduras_chirps_data.txt'
 path <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/'
 
-tictoc::tic()
-run_cpt_sample(run = 1:5, y = y, data_by_id = SST_by_id, path = path, i_fores = 3) 
-tictoc::toc()
+# for run this function it's necessary run in a server... and is it possible 
 
+tictoc::tic()
+run_cpt_sample(run = 1:100, y = y, data_by_id = SST_by_id, path = path, i_fores = 3) 
+tictoc::toc() #  8.281386
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Section 5. Reading G.I. files and construct histogram. 
 # =-=-=
 
-
-list.files(path = paste0(path, 'GI_runs'), pattern = 'GI', full.names =  TRUE)[1]
-
-
-
-
-
-
-
-GI1 <- read_table2("SST_runs/GI_runs/GI1.txt", skip = 5) %>% 
-  tail(n = 1L) %>% 
-  .[, -(1:4)]
+# GI_read <- function(route){
+#   GI <- read_table2(route ,
+#                     skip = 5) %>% 
+#     tail(n = 1L) %>% 
+#     .[, -(1:4)] 
+#   return(GI)}
 
 
+GI <- list.files(path = paste0(path, 'GI_runs') , pattern = 'GI', full.names = TRUE) %>% 
+  as.tibble() %>%
+  mutate(name = list.files(path = path, pattern = 'GI') %>% str_remove('.txt')) %>%
+  mutate(GI = purrr::map(.x = value, .f = GI_read)) %>% 
+  dplyr::select(-value) %>% 
+  unnest()
 
+
+
+real_GI <- read_table2('Feb_Mar-Apr-May_0.8_GI.txt' , skip = 5) %>% tail(n = 1L) %>%  .[, -(1:4)] 
+
+
+GI %>% 
+  ggplot(aes(Index_1)) +
+  geom_density(fill = 'lightskyblue', alpha = 0.4) + 
+  geom_vline(xintercept = real_GI$Index_1, colour = 'lightskyblue', linetype="dashed",  size=2) + 
+  theme_bw() 
 
