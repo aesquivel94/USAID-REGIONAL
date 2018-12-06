@@ -21,6 +21,16 @@ library(glue)
 # setwd(path)
 
 
+# Install CPT in Linux (Tropico server)
+# Linux commands
+# cd USAID_Regional/
+# tar xvzf CPT.15.7.2.tar.gz
+# cd CPT
+# cd 15.7.2
+# make install CPT.x
+
+
+
 # =-=-=-=-=-=-=-=-=-=-=-= Functions.
 
 
@@ -261,7 +271,7 @@ masive_runs <- function( run, data_by_id, path){
 
 
 # This function runs with only one y file... if we have run with several y,  we will need modify it. 
-run_cpt_sample <- function(run, y, data_by_id, path, i_fores){
+run_cpt_sample <- function(run, y, data_by_id, path){
   
   path_out <- paste0(path, 'GI_runs/')
   
@@ -273,7 +283,7 @@ run_cpt_sample <- function(run, y, data_by_id, path, i_fores){
   
   path_run <- paste0(path ,'test.bat')
   
-  purrr::map2(.x = x, .y = run, .f = run_cpt_basic, y = y, i_fores = i_fores, path_run = path_run ,  path_out = path_out)
+  purrr::map2(.x = x, .y = run, .f = run_cpt_basic, y = y, path_run = path_run ,  path_out = path_out)
 }
 
 
@@ -410,9 +420,9 @@ path <- 'C:/Users/aesquivel/Desktop/USAID-Regional/USAID-REGIONAL/SST_runs/'
 # for run this function it's necessary run in a server... and is it possible 
 
 tictoc::tic()
-run_cpt_sample(run = 1:100, y = y, data_by_id = SST_by_id, path = path, i_fores = 3) 
+run_cpt_sample(run = 1:100, y = y, data_by_id = SST_by_id, path = path) 
 tictoc::toc() #  8.281386
-
+# sin Prob = 1.85
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Section 5. Reading G.I. files and construct histogram. 
@@ -435,7 +445,7 @@ GI <- list.files(path = paste0(path, 'GI_runs') , pattern = 'GI', full.names = T
 
 
 
-real_GI <- read_table2('Feb_Mar-Apr-May_0.8_GI.txt' , skip = 5) %>% tail(n = 1L) %>%  .[, -(1:4)] 
+real_GI <- read_table2('GIsd.txt' , skip = 5) %>% tail(n = 1L) %>%  .[, -(1:4)] 
 
 
 GI %>% 
