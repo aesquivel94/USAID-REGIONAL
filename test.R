@@ -1,15 +1,38 @@
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Install CPT in Linux (Tropico server) --- Linux commands
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+# mkdir ./USAID_Regional
+# cd USAID_Regional/
+# tar xvzf CPT.15.7.2.tar.gz
+# cd CPT
+# cd 15.7.2
+# make install CPT.x
+# mkdir Inputs
+# mkdir ./Inputs/SST
+# mkdir ./Inputs/Stations-grid.
+# mkdir ./Inputs/filter_data
+# mkdir ./Inputs/SST_runs
+
+# Ejecutar R. 
+# R
+
+
 # rm(list = ls()); gc()
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Made by:     Alejandra Esquivel Arias. 
-# Created in:  Date: 28-11-2018
+# Created in:  Date: 12-2018
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # CPT predictor area optimization - Resampling.
 #
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Packages. 
+# install.packages('tictoc')
 library(tidyverse)
 library(viridis)
 library(tictoc)
@@ -19,16 +42,6 @@ library(glue)
 # main directory path and setwd it.
 # path <- 'C:/Users/aesquivel/Desktop/USAID-Regional/CPT_R'
 # setwd(path)
-
-
-# Install CPT in Linux (Tropico server)
-# Linux commands
-# cd USAID_Regional/
-# tar xvzf CPT.15.7.2.tar.gz
-# cd CPT
-# cd 15.7.2
-# make install CPT.x
-
 
 
 # =-=-=-=-=-=-=-=-=-=-=-= Functions.
@@ -351,7 +364,7 @@ percent <- list.files(pattern = '[0-9].txt$') %>%
   str_split(., '_0.') %>% 
   unlist %>% 
   .[2] %>% 
-  str_remove('.txt') %>%
+  stringr::str_remove('.txt') %>%
   as.numeric() 
              
 percent <- 1 - (percent/10)         
@@ -451,22 +464,163 @@ real_GI <- read_table2('GIsd.txt' , skip = 5) %>% tail(n = 1L) %>%  .[, -(1:4)]
 GI %>% 
   ggplot(aes(Index_1)) +
   geom_density(fill = 'lightskyblue', alpha = 0.4) + 
-  geom_vline(xintercept = real_GI$Index_1, colour = 'lightskyblue', linetype="dashed",  size=2) + 
-  theme_bw() 
+  geom_vline(xintercept = real_GI$Index_1, 
+             colour = 'lightskyblue', linetype="dashed",  size=1.5) + 
+  theme_bw() +
+  labs(x = 'Goodnes Index', subtitle = paste('Random pixels selected = ', percent))
 
 
 
 
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# =-=-=-=-=-=-=-=-=-=- Linux Sections... 
+# =-=-= Special.
+# =-=-= 
+
+######  Linux Special Functions and other things. 
+
+# =-
+# This function runs it's for run in  a Linux server CPT. 
+
+run_cpt_linux_V <- function(x, run,  y,  path_run,  path_out){
+  
+  GI <- paste0(path_out,"GI", run,".txt")
+  # prob <- paste0(path_out,"prob", run,".txt")
+  
+  cmd <- "@echo off
+  
+  (
+  echo 611
+  echo 545
+  echo 1
+  echo %path_x% 
+  echo /
+  echo /
+  echo /
+  echo /
+  echo 1
+  echo 10
+  echo 2
+  echo %path_y%
+  echo /
+  echo /
+  echo /
+  echo /
+  echo 1
+  echo 10
+  echo 1
+  echo 5
+  echo 9
+  echo 1
+  echo 532
+  echo /
+  echo /
+  echo N
+  echo 2
+  echo 554
+  echo 2
+  echo 541
+  echo 112  
+  echo %path_GI%
+  echo 311
+  echo 0
+  echo 0
+  ) | ./CPT.x"
+
+  
+  cmd<-gsub("%path_x%",x,cmd)
+  cmd<-gsub("%path_y%",y,cmd)
+  cmd<-gsub("%path_GI%",GI,cmd)
+  
+  write(cmd, path_run)
+  system(paste0( "sh ", path_run))
+  
+}
+
+# =-
+
+# This function runs with only one y file... if we have run with several y,  we will need modify it. 
+run_cpt_sample_linux <- function(run, y, data_by_id, path){
+  
+  path_out <- paste0(path, 'GI_runs/')
+  
+  if(dir.exists(path_out) == FALSE){dir.create(path_out)}else{print('ok')}
+  
+  purrr::map(run, .f = masive_runs, data_by_id = data_by_id, path = path)
+  
+  x <- list.files(path = path,  pattern = '.txt$', full.names = TRUE) 
+  
+  path_run <- paste0(path ,'test.sh')
+  
+  purrr::map2(.x = x, .y = run, .f = run_cpt_linux_V, y = y, path_run = path_run ,  path_out = path_out)
+}
 
 
 
+####
+SST <- read.table("/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/SST/Feb_Mar-Apr-May.tsv",
+                  sep="\t",  dec=".", skip =2, 
+                  fill=TRUE,na.strings =-999)
+
+
+# filter dates and rows contains cpt:field...
+SST_filter <- SST %>%
+  filter(row_number() != 1) %>% 
+  filter(!grepl("cpt:field", V1)) 
+
+# Compute Length for one layer (year-raster).  
+SST_length <- which(SST_filter$V1 == '')[1:2]
+
+# Tomorrow fix this part because in that server this package have problems. 
+percent <- 0.8
+
+# extract dates in CPT format 
+CPT_dates <- SST[1, -1][which(!is.na(SST[1, -1]))] %>%  
+  t() %>% 
+  as.tibble() %>% 
+  set_names('date') %>% 
+  mutate(id = seq(1982,2015,1))
+
+
+tictoc::tic()
+SST_by_id <- SST_filter %>%
+  tbl_df()  %>%
+  mutate(id = rep(1982:2015, each = SST_length[2] - SST_length[1])) %>% 
+  nest(-id) %>%
+  mutate(new_data = purrr::map(.x = data, .f = add_long)) %>%
+  select(-data)
+tictoc::toc() # 5.65 sec.
 
 
 
+# Paste real dates from CPT
+SST_by_id <- SST_by_id %>% 
+  right_join(CPT_dates, ., by = 'id')
 
 
 
+y <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/Stations-grid./honduras_chirps_data.txt'
+path <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/SST_runs/'
 
+# for run this function it's necessary run in a server... and is it possible 
+
+tictoc::tic()
+run_cpt_sample_linux(run = 1:100, y = y, data_by_id = SST_by_id, path = path) 
+tictoc::toc() #  8.281386
+
+
+# =-=- 
+
+GI <- list.files(path = paste0(path, 'GI_runs') , pattern = 'GI', full.names = TRUE) %>% 
+  as.tibble() %>%
+  mutate(name = list.files(path = path, pattern = 'GI') %>% str_remove('.txt')) %>%
+  mutate(GI = purrr::map(.x = value, .f = GI_read)) %>% 
+  dplyr::select(-value) %>% 
+  unnest()
+
+
+
+real_GI <- read_table2('GIsd.txt' , skip = 5) %>% tail(n = 1L) %>%  .[, -(1:4)] 
 
 
 
