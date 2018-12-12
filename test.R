@@ -561,80 +561,97 @@ run_by_rsample <- function(path_SST, percent, y, path){
   
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   # Section 1. Reading original SST data set. 
-  
+  percent <- as.numeric(percent)
+  print(percent)
   # Read SST...
   SST <- read.table(path_SST, sep="\t",  dec=".", skip =2, fill=TRUE,na.strings =-999)
-  
-  # filter dates and rows contains cpt:field...
+
+#   # filter dates and rows contains cpt:field...
   SST_filter <- SST %>%
-    filter(row_number() != 1) %>% 
-    filter(!grepl("cpt:field", V1)) 
-  
-  # Compute Length for one layer (year-raster).  
+    filter(row_number() != 1) %>%
+    filter(!grepl("cpt:field", V1))
+
+  # Compute Length for one layer (year-raster).
   SST_length <- which(SST_filter$V1 == '')[1:2]
+
   
-  
-  # extract dates in CPT format 
-  CPT_dates <- SST[1, -1][which(!is.na(SST[1, -1]))] %>%  
-    t() %>% 
-    as.tibble() %>% 
-    set_names('date') %>% 
+  # extract dates in CPT format
+  CPT_dates <- SST[1, -1][which(!is.na(SST[1, -1]))] %>%
+    t() %>%
+    as.tibble() %>%
+    set_names('date') %>%
     mutate(id = seq(1982,2015,1))
-  
-  
+
   # tictoc::tic()
   SST_by_id <- SST_filter %>%
     tbl_df()  %>%
-    mutate(id = rep(1982:2015, each = SST_length[2] - SST_length[1])) %>% 
+    mutate(id = rep(1982:2015, each = SST_length[2] - SST_length[1])) %>%
     nest(-id) %>%
     mutate(new_data = purrr::map(.x = data, .f = add_long)) %>%
     select(-data)
   # tictoc::toc() # 5.65 sec.
-  
-  
+
+
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  # Section 2. Sampling SST and convert to CPT format.  
+  # Section 2. Sampling SST and convert to CPT format.
   # =-=-=
 
-  
+
   # Paste real dates from CPT
-  SST_by_id <- SST_by_id %>% 
+  SST_by_id <- SST_by_id %>%
     right_join(CPT_dates, ., by = 'id')
-  
-  
-  
-  # Create a folder results... in this case is useful to use name sst directory. 
+
+
+  # Create a folder results... in this case is useful to use name sst directory.
   # path
- 
+
   path <- paste0(path , gsub('.tsv', '', path_SST %>%  basename()) )
   if(dir.exists(path) == FALSE){dir.create(path)}else{print('ok')}
-  
-  # for run this function it's necessary run in a server... and is it possible 
-  run_cpt_sample_linux(run = 1:10, y = y, data_by_id = SST_by_id, path = path) 
-  
 
-  GI <- list.files(path = paste0(path, '/GI_runs') , pattern = 'GI', full.names = TRUE) %>% 
+  # for run this function it's necessary run in a server... and is it possible
+  run_cpt_sample_linux(run = 1:10, y = y, data_by_id = SST_by_id, path = path)
+
+
+  GI <- list.files(path = paste0(path, '/GI_runs') , pattern = 'GI', full.names = TRUE) %>%
     as.tibble() %>%
     mutate(name = list.files(path = path, pattern = 'GI') %>% gsub(('.txt'), '')   ) %>%
-    mutate(GI = purrr::map(.x = value, .f = GI_read)) %>% 
-    dplyr::select(-value) %>% 
+    mutate(GI = purrr::map(.x = value, .f = GI_read)) %>%
+    dplyr::select(-value) %>%
     unnest()
- 
+  
+  write_csv(x = GI, path = paste0(path, '/GI.csv'))
+
 return(GI)}
 
+# run_by_rsample(path_SST = data_GI$path_SST[1], percent = data_GI$percent[1], y = y, path = path)
 
 
 
 y <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/Stations-grid./honduras_chirps_data.txt'
 path <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/SST_runs/'
-path_SST <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/SST/Feb_Mar-Apr-May.tsv'
+path_SST <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/SST/'
 
 
-percent <- 0.8 # Fix this part 
+data_GI <- list.files('/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/filter_data/') %>% 
+  as.tibble() %>% 
+  mutate(numeric = value %>% gsub("[^[:digit:]]", "", .) %>%  as.numeric(.)) %>% 
+  mutate(percent = 1 - numeric/10) %>% 
+  mutate(path_SST = paste0(path_SST, value %>%  substr(., 1, 15), '.tsv'))
 
-GI <- run_by_rsample(path_SST = path_SST, percent = percent, y = y, path = path)
+rm(path_SST)
+
+# GI <- run_by_rsample(path_SST = path_SST, percent = percent, y = y, path = path)
+
+tictoc::tic()
+data_GI <- data_GI %>% 
+  mutate(GI =  purrr::map2(.x = path_SST, .y = percent, .f = run_by_rsample, y = y , path = path))
+tictoc::toc()
 
 
+# if it's necessary change y (stations or grid information), we only need change y for the new file.
+
+
+# fix this part... 
 real_GI <- read_table2('/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/GI_Selection_area/GIsd.txt' , skip = 5) %>% tail(n = 1L) %>%  .[, -(1:4)] 
 
 GI %>% 
