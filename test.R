@@ -1,3 +1,10 @@
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Made by:     Alejandra Esquivel Arias. 
+# Created in:  Date: 12-2018
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# CPT predictor area optimization - Resampling.
+#
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Install CPT in Linux (Tropico server) --- Linux commands
@@ -22,13 +29,6 @@
 
 # rm(list = ls()); gc()
 
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# Made by:     Alejandra Esquivel Arias. 
-# Created in:  Date: 12-2018
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# CPT predictor area optimization - Resampling.
-#
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
