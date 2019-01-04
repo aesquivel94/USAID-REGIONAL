@@ -48,8 +48,35 @@ library(raster)
 
 # =-=-=-=-=-=-=-=-=-=-=-= Functions.
 
+# This function have a problem with found all sample in the real region.
+# sp::spsample
+# GSIF::sample.grid()
+library(sp)
+
+# sample size 
+# n <- 20
+# type <- 'clustered'
+
+data(meuse.grid) # This shoud be SST
+gridded(meuse.grid) = ~x+y
+image(meuse.grid)
+
+test <- 0
+for(i in 1:10000){
+sample_sp <- spsample(meuse.grid,n=100,type="clustered") 
+test[i] <- sample_sp %>% data.frame() %>% dim %>% .[1]
+}
+
+hist(test)
+
+
+points(sample_sp , pch=3, cex=.5)
+plot(meuse.grid)
 
 
 
+#####################################
+#####################################
 
-
+library(sf)
+# st_sample
