@@ -182,7 +182,7 @@ write_cpt <- function(x, file){
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
 # Section 3. 
-# Run CPT from R console (in this case for ERSST). 
+# Run CPT from R console (in this case for CFSv2). 
 
 
 # x <- SST file with path. 
