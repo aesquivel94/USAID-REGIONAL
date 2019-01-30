@@ -426,7 +426,7 @@ GI_read <- function(route){
 # tictoc::tic()
 # SST_by_id <- SST_filter %>%
 #   tbl_df()  %>%
-#   mutate(id = rep(1982:2015, each = SST_length[2] - SST_length[1])) %>% 
+#   mutate(id = rep(1982:year_f, each = SST_length[2] - SST_length[1])) %>% 
 #   nest(-id) %>%
 #   mutate(new_data = purrr::map(.x = data, .f = add_long)) %>%
 #   select(-data)
@@ -463,7 +463,7 @@ GI_read <- function(route){
 #   t() %>% 
 #   as.tibble() %>% 
 #   set_names('date') %>% 
-#   mutate(id = seq(1982,2015,1))
+#   mutate(id = seq(1982,year_f,1))
 
 
 # Paste real dates from CPT
@@ -522,7 +522,7 @@ GI_read <- function(route){
 # for run this function it's necessary run in a server... and is it possible 
 
 # tictoc::tic()
-# run_cpt_sample(run = 1:100, y = y, data_by_id = SST_by_id, path = path) 
+# run_cpt_sample(run = 1:all_runs, y = y, data_by_id = SST_by_id, path = path) 
 # tictoc::toc() #  8.281386
 # sin Prob = 1.85
 
@@ -586,12 +586,12 @@ run_by_rsample <- function(path_SST, percent, y, path){
     t() %>%
     as.tibble() %>%
     set_names('date') %>%
-    mutate(id = seq(1982,2015,1))
+    mutate(id = seq(1982,year_f,1))
 
   # tictoc::tic()
   SST_by_id <- SST_filter %>%
     tbl_df()  %>%
-    mutate(id = rep(1982:2015, each = SST_length[2] - SST_length[1])) %>%
+    mutate(id = rep(1982:year_f, each = SST_length[2] - SST_length[1])) %>%
     nest(-id) %>%
     mutate(new_data = purrr::map(.x = data, .f = add_long)) %>%
     select(-data)
@@ -615,7 +615,7 @@ run_by_rsample <- function(path_SST, percent, y, path){
   if(dir.exists(path) == FALSE){dir.create(path)}else{print('ok')}
 
   # for run this function it's necessary run in a server... and is it possible
-  run_cpt_sample_linux(run = 1:10, y = y, data_by_id = SST_by_id, path = path)
+  run_cpt_sample_linux(run = 1:all_runs, y = y, data_by_id = SST_by_id, path = path)
 
 
   GI <- list.files(path = paste0(path, '/GI_runs') , pattern = 'GI', full.names = TRUE) %>%
@@ -636,6 +636,10 @@ return(GI)}
 y <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/Stations-grid./honduras_chirps_data.txt'
 path <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/SST_runs/'
 path_SST <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/SST/'
+
+
+year_f <- 2015
+all_runs <- 100
 
 
 data_GI <- list.files('/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/filter_data/') %>% 
