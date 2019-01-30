@@ -1,6 +1,6 @@
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Made by:     Alejandra Esquivel Arias. 
-# Created in:  Date: 12-2018
+# Created in:  Date: 1-2019
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # CPT predictor area optimization - Resampling.
 #
@@ -39,6 +39,10 @@ library(tidyverse)
 library(viridis)
 library(tictoc)
 library(glue)
+
+
+year_f <- 2015
+all_runs <- 100
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # main directory path and setwd it.
