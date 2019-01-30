@@ -1,9 +1,20 @@
 rm(list = ls()); gc(reset = TRUE)
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Made by:     Alejandra Esquivel Arias. 
+# Created in:  Date: 1-2019
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# CPT predictor area optimization - Resampling.
+
 
 library(tidyverse)
 library(viridis)
 library(tictoc)
 library(glue)
+
+year_f <- 2015
+all_runs <- 100
+
+
 
 # =-=-=-=-=-=-=-=-=-=-=-= Functions.
 
@@ -95,6 +106,10 @@ one_spread_layer <- function(data, row_positions){
 ## This function do inctial rows (URL, field, first year), and save the first layer. 
 write_cpt_head_ER <- function(x, file){
   
+  year <- dplyr::select(x, date)  %>% 
+    filter(row_number() == 1) %>% 
+    as.character()
+  
   # x <- SST_sample
   x <- dplyr::select(x, -id, -date) %>% 
     filter(row_number() == 1) %>% 
@@ -104,7 +119,8 @@ write_cpt_head_ER <- function(x, file){
   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
   # cat('xmlns:cf=http://cf-pcmdi.llnl.gov/documents/cf-conventions/1.4/', sep = '\n')
   cat('cpt:nfields=1', sep = '\n')
-  cat('cpt:field=ssta, cpt:T=1982-03/05, cpt:nrow=31, cpt:ncol=180, cpt:row=Y, cpt:col=X, cpt:units=Celsius_scale, cpt:missing=-999', sep = '\n')
+  # cat('cpt:field=ssta, cpt:T=1982-03/05, cpt:nrow=31, cpt:ncol=180, cpt:row=Y, cpt:col=X, cpt:units=Celsius_scale, cpt:missing=-999', sep = '\n')
+  cat(glue('cpt:field=ssta, cpt:T={year}, cpt:nrow=31, cpt:ncol=180, cpt:row=Y, cpt:col=X, cpt:units=Celsius_scale, cpt:missing=-999'), sep = '\n')
   cat(write.table(x, sep = '\t', col.names = FALSE, row.names = FALSE, na = ""))
   sink()
   
@@ -288,12 +304,12 @@ run_by_rsample <- function(path_SST, percent, y, path){
     t() %>%
     as.tibble() %>%
     set_names('date') %>%
-    mutate(id = seq(1982,2015,1))
+    mutate(id = seq(1982,year_f,1))
   
   # tictoc::tic()
   SST_by_id <- SST_filter %>%
     tbl_df()  %>%
-    mutate(id = rep(1982:2015, each = SST_length[2] - SST_length[1])) %>%
+    mutate(id = rep(1982:year_f, each = SST_length[2] - SST_length[1])) %>%
     nest(-id) %>%
     mutate(new_data = purrr::map(.x = data, .f = add_long)) %>%
     select(-data)
@@ -317,7 +333,7 @@ run_by_rsample <- function(path_SST, percent, y, path){
   if(dir.exists(path) == FALSE){dir.create(path)}else{print('ok')}
   
   # for run this function it's necessary run in a server... and is it possible
-  run_cpt_sample_linux(run = 1:10, y = y, data_by_id = SST_by_id, path = path)
+  run_cpt_sample_linux(run = 1:all_runs, y = y, data_by_id = SST_by_id, path = path)
   
   
   GI <- list.files(path = paste0(path, '/GI_runs') , pattern = 'GI', full.names = TRUE) %>%
@@ -331,7 +347,7 @@ run_by_rsample <- function(path_SST, percent, y, path){
   
   return(GI)}
 
-run_by_rsample(path_SST, percent, y, path)
+# run_by_rsample(path_SST, percent, y, path)
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
@@ -346,6 +362,9 @@ path <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/SST_runs/'
 path_SST <- '/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/SST/'
 
 
+year_f <- 2015
+all_runs <- 2
+
 
 
 # Change for list.files, because if you have several SST files. 
@@ -355,69 +374,31 @@ data_GI <-  list.files('/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/filter_
   mutate(percent = 1 - numeric/10) %>% 
   mutate(path_SST = paste0(path_SST, value %>%  substr(., 1, 15), '.tsv'))
 
+rm(path_SST)
 
-percent <- 0.2
-print(percent)
+# percent <- 0.2
+# print(percent)
 
 tictoc::tic()
 data_GI <- data_GI %>% 
-  filter()
   mutate(GI =  purrr::map2(.x = path_SST, .y = percent, .f = run_by_rsample, y = y , path = path))
 tictoc::toc()
 
 # run_by_rsample(path_SST = path_SST, percent = 0.2, y = y, data_GI )
 
+# GI <- run_by_rsample(path_SST = path_SST, percent = percent, y = y, path = path)
 
 
-#   # filter dates and rows contains cpt:field...
-SST_filter <- SST %>%
-  filter(row_number() != 1) %>%
-  filter(!grepl("cpt:field", V1)) %>% 
-  .[-1,]
+# fix this part... 
+real_GI <- read_table2('/home/aesquivel/USAID_Regional/CPT/15.7.2/Inputs/GI_Selection_area/GIsd.txt' , skip = 5) %>% tail(n = 1L) %>%  .[, -(1:4)] 
 
-
-# Compute Length for one layer (year-raster).
-SST_length <- which(SST_filter$V1 == '')[1:2]
-
-
-
-# extract dates in CPT format
-CPT_dates <- SST[2, -1][which(!is.na(SST[2, -1]))] %>%
-  t() %>%
-  as.tibble() %>%
-  set_names('date') %>%
-  mutate(id = seq(1982,2015,1)) # Modificar esta parte. 
-
-
-SST_by_id <- SST_filter[-1,] %>%
-  tbl_df()  %>%
-  mutate(id = rep(1982:2015, each = SST_length[2] - SST_length[1])) %>% # modificar esta parte
-  nest(-id) %>%
-  mutate(new_data = purrr::map(.x = data, .f = add_long)) %>%
-  select(-data)
-
-
-
-
-
-SST_filter %>%
-  tbl_df()  %>%
-  mutate(id = rep(1982:2015, each = 34))
-
-
-
-
-
-SST_by_id <- SST_by_id %>%
-  right_join(CPT_dates, ., by = 'id')
-
-
-
-
-
-
-
-
+GI %>% 
+  ggplot(aes(Index_1)) +
+  geom_density(fill = 'lightskyblue', alpha = 0.4) + 
+  geom_vline(xintercept = real_GI$Index_1, 
+             colour = 'lightskyblue', linetype="dashed",  size=1.5) + 
+  theme_bw() +
+  labs(x = 'Goodnes Index', subtitle = paste('Random pixels selected = ', percent))
 
 
 
