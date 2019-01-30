@@ -29,7 +29,8 @@
 
 # rm(list = ls()); gc()
 
-
+# It's important ubicate in CPT program folder, in this case it's  ~/USAID_Regional/CPT/15.7.2
+# Caribe server
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Packages. 
@@ -128,20 +129,25 @@ return(spread_layer)}
 
 ## =-=-=-=-=-=-
 # Create SST's CPT file, for that we need 3 functions. 
-
+#write_cpt(x = SST_sample, file = paste0(path, '/run_', as.numeric(run) ,'.txt') ) 
 
 ## This function do inctial rows (URL, field, first year), and save the first layer. 
 write_cpt_head <- function(x, file){
   
-  # x <- SST_sample
+  year <- dplyr::select(x, date)  %>% 
+    filter(row_number() == 1) %>% 
+    as.character()
+  
   x <- dplyr::select(x, -id, -date) %>% 
     filter(row_number() == 1) %>% 
     unnest
-  
+
+ 
   sink(file = file)
   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
   cat('cpt:nfields=1', sep = '\n')
-  cat('cpt:field=ssta, cpt:T=1982-03/05, cpt:nrow=61, cpt:ncol=360, cpt:row=Y, cpt:col=X, cpt:units=Kelvin_scale, cpt:missing=-999', sep = '\n')
+  # cat('cpt:field=ssta, cpt:T=1982-03/05, cpt:nrow=61, cpt:ncol=360, cpt:row=Y, cpt:col=X, cpt:units=Kelvin_scale, cpt:missing=-999', sep = '\n')
+  cat(glue('cpt:field=ssta, cpt:T={year}, cpt:nrow=61, cpt:ncol=360, cpt:row=Y, cpt:col=X, cpt:units=Kelvin_scale, cpt:missing=-999'), sep = '\n')
   cat(write.table(x, sep = '\t', col.names = FALSE, row.names = FALSE, na = ""))
   sink()
   
