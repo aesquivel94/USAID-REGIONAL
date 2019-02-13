@@ -92,15 +92,15 @@ id_year_prec <- Prec_table %>%
   nest(-year, -id)  %>% 
   mutate(data = purrr::map(.x = data, .f = function(.x){ data <- .x %>% 
       mutate(mov = movavg(x = prec, n = 31, type = 't')) })) 
-
+# n = 30, atlas de canicula... (intruduccion)
 
 
 
 
 test <- id_year_prec %>% 
-  filter(id == 1, year == 2010) %>% 
+  filter(id == 110, year == 2003) %>% 
   unnest() %>% 
-  filter(month %in% 6:9) 
+  filter(month %in% 5:10) 
 
 
 test1 <- test %>% 
@@ -108,11 +108,87 @@ test1 <- test %>%
     lag(mov) > mov & lead(mov) > mov ~ 1, 
     lead(mov) < mov & lag(mov) < mov ~ 2,
     TRUE ~ 0  ) )
+
+
+# =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+# New information (2016)
+# 
+
+start_to <- test1 %>% 
+  filter(month %in% c(6,8)) %>% 
+  filter(row_number() %in% c(1, nrow(.))) %>% 
+  dplyr::select(julian) 
+
+
+first_max <- test1 %>% 
+  filter(month %in% c(5,6)) %>% 
+  filter(row_number() %in% c(1, nrow(.))) %>% 
+  dplyr::select(julian) 
+
+
+
+second_max <- test1 %>% 
+  filter(month %in% c(9,10)) %>% 
+  filter(row_number() %in% c(1, nrow(.))) %>% 
+  dplyr::select(julian) 
+
+
+
+ggplot(test1, aes(julian, mov)) + 
+  geom_rect(aes(xmin = as.numeric(second_max[1,]), xmax = as.numeric(second_max[2,]), 
+                ymin = -Inf, ymax = Inf), fill = 'mediumspringgreen', alpha = 0.01) + 
+  geom_rect(aes(xmin = as.numeric(first_max[1,]), xmax = as.numeric(first_max[2,]), 
+                ymin = -Inf, ymax = Inf), fill = 'pink', alpha = 0.01)  +
+  geom_rect(aes(xmin = as.numeric(start_to[1,]), xmax = as.numeric(start_to[2,]), 
+                ymin = -Inf, ymax = Inf), fill = 'skyblue', alpha = 0.01) + 
+  geom_line() +
+  theme_bw()
+
+
+
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+# 
+# =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+# 1. Canicula between Jun 1 to Aug 30. 
+# 2. The shortest MSD would have a duration of 10 days. 
+# 3. Start usually after May–June.
+# 4. End normally taking place around September–October.
+# 5. Restriction that the difference of precipitation between them 
+#    and the minimum should be at least 20 % per day.
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+
+
 ## despues del ultimo maximo no contar esos minimos
 ## antes del primer maximo no deberian haber minimos
 ## basicamente buscar entre esos dos
 ## cuando no tenga final de canicula que ponga el ultimo valor
+## fecha posible canicula es entre 1 junio y 30 agosto
+i=1
 
+# First select id and year data set
+test <- id_year_prec %>% 
+  filter(id == i, year == 2003) %>% 
+  unnest() %>% 
+  filter(month %in% 5:10) 
+
+# Create Local = (is it a local max or min). 
+test1 <- test %>% 
+  mutate(Local = case_when(
+    lag(mov) > mov & lead(mov) > mov ~ 1, 
+    lead(mov) < mov & lag(mov) < mov ~ 2,
+    TRUE ~ 0  ) )
 
 first_maximum <- test1 %>%
   filter(Local == 2) %>%
@@ -193,29 +269,70 @@ next_minimum <- function(x, fecha){
   return(result)
   
 }
+
+
 posible_minimo <- next_minimum(x = test1, fecha = dates_canicula)
-  # filter(julian >= 219)
+
+cond_canicula <- posible_minimo %>%
+  mutate(cond_midsummer = between(month, 6, 8)) %>%
+  pull(cond_midsummer)
+
+date_minimo <- posible_minimo %>%
+  dplyr::select(date) %>%
+  pull
+
+
+left_maximum <- init_canicula %>%
+  filter(date < date_minimo)
+
+date_maximo <- left_maximum %>%
+  dplyr::select(date) %>%
+  pull
+
+left_maximum <- tibble(minimo = date_minimo, maximo = date_maximo) %>%
+  mutate(day = time_length(maximo - minimo, "day")) %>%
+  arrange(desc(day))
+  # filter(row_number()==1)
+
+left_maximum <- inner_join(init_canicula, left_maximum, by = c('date' = 'maximo')) %>%
+  mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
+  filter(pendiente >= 0.20) %>%
+  arrange(desc(mov)) %>%
+  dplyr::select(pendiente) %>%
+  summarise(mean())
+  filter(row_number()==1)
+ 
+  
+if(isTRUE(cond_canicula)){
   ggplot() + 
-  geom_line(data = test1, aes(julian, mov)) + 
-  # geom_line(aes(julian, prec)) +
-    geom_vline(data = init_canicula, mapping=aes(xintercept=julian), color='blue') +
-    geom_vline(data = posible_minimo, mapping=aes(xintercept=julian), color='red')
+    geom_line(data = test1, aes(julian, mov)) + 
+    # geom_line(aes(julian, prec)) +
+    geom_vline(data = left_maximum, mapping=aes(xintercept=julian), color='blue') +
+    geom_vline(data = posible_minimo, mapping=aes(xintercept=julian), color='red') +
+    geom_smooth(data = test1, aes(julian, mov))
   
+}else{
   
-  geom_vline(xintercept = c(213, 238, 248, 251, 256))
-  geom_vline(data = test1 %>% filter(Local == 1), mapping=aes(xintercept=julian), color='blue') +
-    geom_vline(data = test1 %>% filter(Local == 2), mapping=aes(xintercept=julian), color='red')
+  print("Lo sentimos, Jeferson esta probando otras metodologias")
+}
+
+  # filter(julian >= 219)
+
+  
+  # geom_vline(xintercept = c(213, 238, 248, 251, 256))
+  # geom_vline(data = test1 %>% filter(Local == 1), mapping=aes(xintercept=julian), color='blue') +
+  #   geom_vline(data = test1 %>% filter(Local == 2), mapping=aes(xintercept=julian), color='red')
 
 
 
 
 
-test <-  test %>% 
-  mutate(Local = case_when(
-    lag(mov) > mov & lead(mov) > mov ~ 1, 
-    lead(mov) < mov & lag(mov) < mov ~ 2,
-    TRUE ~ 0  ) ) %>% 
-   filter(Local != 0) 
+# test <-  test %>% 
+#   mutate(Local = case_when(
+#     lag(mov) > mov & lead(mov) > mov ~ 1, 
+#     lead(mov) < mov & lag(mov) < mov ~ 2,
+#     TRUE ~ 0  ) ) %>% 
+#    filter(Local != 0) 
  
 
 
@@ -234,18 +351,18 @@ test <-  test %>%
 
 
 
-test %>% 
-  filter(Local != 0) %>%
-  arrange(desc(mov)) %>% 
-  mutate(Local_less = Local - lead(Local)) %>% 
-  filter(Local_less == 0) %>% # fix
-  arrange(julian) %>% 
-  dplyr::select(-Local_less) %>% 
-  mutate(condition = case_when(
-    mov == min(mov) ~  1, 
-    # mov == max(mov) ~ 1, 
-    TRUE ~ 0
-  )) %>% ggplot(aes(julian, mov, colour = as.factor(Local))) + geom_point()  
+# test %>% 
+#   filter(Local != 0) %>%
+#   arrange(desc(mov)) %>% 
+#   mutate(Local_less = Local - lead(Local)) %>% 
+#   filter(Local_less == 0) %>% # fix
+#   arrange(julian) %>% 
+#   dplyr::select(-Local_less) %>% 
+#   mutate(condition = case_when(
+#     mov == min(mov) ~  1, 
+#     # mov == max(mov) ~ 1, 
+#     TRUE ~ 0
+#   )) %>% ggplot(aes(julian, mov, colour = as.factor(Local))) + geom_point()  
 
 
 
