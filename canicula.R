@@ -175,7 +175,7 @@ ggplot(test1, aes(julian, mov)) +
 ## basicamente buscar entre esos dos
 ## cuando no tenga final de canicula que ponga el ultimo valor
 ## fecha posible canicula es entre 1 junio y 30 agosto
-i=1
+# i=2
 
 # First select id and year data set
 test <- id_year_prec %>% 
@@ -190,11 +190,14 @@ test1 <- test %>%
     lead(mov) < mov & lag(mov) < mov ~ 2,
     TRUE ~ 0  ) )
 
+
+# Cumpute the first local max in the data. 
 first_maximum <- test1 %>%
   filter(Local == 2) %>%
   filter(row_number()==1) %>%
   pull(julian)
 
+# Fecha del posible inicio de la canicula. 
 init_canicula <- test1 %>%
   filter(Local ==2) %>%
   filter(julian >=first_maximum, julian <225) %>%
@@ -202,20 +205,23 @@ init_canicula <- test1 %>%
   arrange(desc(mov)) %>%
   filter(row_number() <= 3)
 
+# ultima fecha de la posible canicula 
 last_date <- test1 %>%
   filter(row_number() == n())
 
-# buscar el minimo siguiente
+# buscar el minimo siguiente (incluyendo el final del periodo. )
 
 dates_canicula <- init_canicula %>%
   bind_rows(last_date) %>%
   pull(date)
 
+
+#  This function compute a Min local min. 
 next_minimum <- function(x, fecha){
   
   ## x <- test1
   ## fecha <- dates_canicula
-  y = data_frame(date = dates_canicula, date1 = dates_canicula) %>%
+  y <- data_frame(date = fecha, date1 = fecha) %>%
     complete(date, date1) %>%
     mutate(diff_length = time_length(date - date1, unit = "day")) %>%
     filter(diff_length < 0) %>%
@@ -254,7 +260,7 @@ next_minimum <- function(x, fecha){
   }
   
   
-  minimos <- purrr::map(.x = dates_filter, .f = return_df, test1)
+  minimos <- purrr::map(.x = dates_filter, .f = return_df, x)
 
   result <- purrr::map(.x = minimos, .f = function(x){
     
@@ -266,107 +272,161 @@ next_minimum <- function(x, fecha){
     arrange(mov) %>%
     filter(row_number()==1)
     
-  return(result)
-  
-}
+  return(result) }
 
-
+# This is the canicula min.
 posible_minimo <- next_minimum(x = test1, fecha = dates_canicula)
 
+
+# This part compute if the mind it's in a establish limits. 
 cond_canicula <- posible_minimo %>%
   mutate(cond_midsummer = between(month, 6, 8)) %>%
   pull(cond_midsummer)
 
+# day when occur min local min. 
 date_minimo <- posible_minimo %>%
   dplyr::select(date) %>%
   pull
 
-
+# find the possible start canicula. 
 left_maximum <- init_canicula %>%
   filter(date < date_minimo)
 
+# dates to find posibble start canicula.
 date_maximo <- left_maximum %>%
   dplyr::select(date) %>%
   pull
 
+
+# Compute the difference of the days with the min local min. 
 left_maximum <- tibble(minimo = date_minimo, maximo = date_maximo) %>%
   mutate(day = time_length(maximo - minimo, "day")) %>%
   arrange(desc(day))
   # filter(row_number()==1)
 
+
+# Aqui se hay un problema 
 left_maximum <- inner_join(init_canicula, left_maximum, by = c('date' = 'maximo')) %>%
   mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
   filter(pendiente >= 0.20) %>%
   arrange(desc(mov)) %>%
-  dplyr::select(pendiente) %>%
-  summarise(mean())
+  # dplyr::select(pendiente) %>%
+  # summarise(mean())
   filter(row_number()==1)
+
+
+
+
+# Try to do second max. 
+
+
+End_canicula <- test1 %>%
+  filter(Local ==2) %>%
+  filter(date >= date_minimo + 5) %>%
+  top_n(4, wt = mov) %>%
+  arrange(desc(mov)) %>%
+  filter(row_number() <= 3) %>% 
+  mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
+  filter(pendiente >= 0.20) %>% 
+  arrange(desc(mov)) %>%
+  # dplyr::select(pendiente) %>%
+  # summarise(mean())
+  filter(row_number()==1)
+
+
+
+
+
+
+
+
  
   
+
+
+
+
+
+
 if(isTRUE(cond_canicula)){
   ggplot() + 
     geom_line(data = test1, aes(julian, mov)) + 
     # geom_line(aes(julian, prec)) +
     geom_vline(data = left_maximum, mapping=aes(xintercept=julian), color='blue') +
     geom_vline(data = posible_minimo, mapping=aes(xintercept=julian), color='red') +
+    geom_vline(data = End_canicula, mapping=aes(xintercept=julian), color='green') +
+    geom_vline(xintercept = 220) +
     geom_smooth(data = test1, aes(julian, mov))
   
 }else{
   
-  print("Lo sentimos, Jeferson esta probando otras metodologias")
+  cowsay::say("Lo sentimos, Jeferson esta probando otras metodologias", 
+              "smallcat", what_color = "blue")
 }
 
-  # filter(julian >= 219)
+
+
+
+
+test1 %>% 
+  mutate(ti = (mov - lag(mov)) /mov) %>% 
+  ggplot(.)  +
+  geom_line(aes(julian, ti))
+  # End_canicula <- 
+    
+
+
+
+
+
+
+End <- test1 %>%
+  filter(Local ==2) %>%
+  filter(date >= date_minimo + 5) %>%
+  top_n(4, wt = mov) %>%
+  arrange(desc(mov)) %>%
+  filter(row_number() <= 3) 
+    
+    
+
+
+
+    
+End %>% 
+    mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
+    filter(pendiente >= 0.20) %>% 
+    arrange(desc(mov)) %>%
+    filter(row_number()==1)
+  
+
+
+date_minimo
+End
+
+
+proof <- cbind(date_minimo, End) %>% 
+  as.tbl() %>% 
+  dplyr::select(date_minimo, date, julian) %>% 
+  nest(- julian )
+
+
+proof %>% 
+  select(data) %>% unnest
+
+proof %>%
+  mutate(increments = purrr::map(.x = data, .f = function(.x){
+    # .x <- proof %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
+    test1 %>% 
+      mutate(ti = (mov - lag(mov))/mov) %>%
+      filter(between(date, .x$date_minimo  + 5, .x$date)) %>% 
+      summarise(acum_ti = sum(ti), mean_ti = mean(ti), median_ti = median(ti))
+  }) ) %>% 
+  dplyr::select(-data) %>% 
+  unnest()
+  
+
+
 
   
-  # geom_vline(xintercept = c(213, 238, 248, 251, 256))
-  # geom_vline(data = test1 %>% filter(Local == 1), mapping=aes(xintercept=julian), color='blue') +
-  #   geom_vline(data = test1 %>% filter(Local == 2), mapping=aes(xintercept=julian), color='red')
-
-
-
-
-
-# test <-  test %>% 
-#   mutate(Local = case_when(
-#     lag(mov) > mov & lead(mov) > mov ~ 1, 
-#     lead(mov) < mov & lag(mov) < mov ~ 2,
-#     TRUE ~ 0  ) ) %>% 
-#    filter(Local != 0) 
- 
-
-
-
-
-
-# test %>% 
-#   mutate(cond = case_when(
-#     Local == 1 & row_number() == n() ~ n(), 
-#     TRUE ~ 0 
-#   ))
-
-
-
-
-
-
-
-# test %>% 
-#   filter(Local != 0) %>%
-#   arrange(desc(mov)) %>% 
-#   mutate(Local_less = Local - lead(Local)) %>% 
-#   filter(Local_less == 0) %>% # fix
-#   arrange(julian) %>% 
-#   dplyr::select(-Local_less) %>% 
-#   mutate(condition = case_when(
-#     mov == min(mov) ~  1, 
-#     # mov == max(mov) ~ 1, 
-#     TRUE ~ 0
-#   )) %>% ggplot(aes(julian, mov, colour = as.factor(Local))) + geom_point()  
-
-
-
-
-
-
+  
 
