@@ -337,11 +337,52 @@ End_canicula <- test1 %>%
 
 
 
+# =-=-=-=-=-= 
+
+# test1 %>% 
+#   mutate(ti = (mov - lag(mov)) /mov) %>% 
+#   ggplot(.)  +
+#   geom_line(aes(julian, ti))
 
 
 
- 
+# This object have the possibles end of MSD
+
+End <- test1 %>%
+  filter(Local ==2) %>%
+  filter(date >= date_minimo + 5) %>%
+  top_n(4, wt = mov) %>%
+  arrange(desc(mov)) %>%
+  filter(row_number() <= 3) 
   
+
+# End %>% 
+#   mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
+#   filter(pendiente >= 0.20) %>% 
+#   arrange(desc(mov)) %>%
+#   filter(row_number()==1)
+
+
+# date_minimo
+# End
+
+
+second_max <- cbind(date_minimo, End) %>% 
+  as.tbl() %>% 
+  dplyr::select(date_minimo, date, julian) %>% 
+  nest(- julian ) %>%
+  mutate(increments = purrr::map(.x = data, .f = function(.x){
+    # .x <- proof %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
+    test1 %>% 
+      mutate(ti = (mov - lag(mov))/mov) %>%
+      filter(between(date, .x$date_minimo  + 5, .x$date)) %>% 
+      summarise(acum_ti = sum(ti), mean_ti = mean(ti), median_ti = median(ti))
+  }) ) %>% 
+  dplyr::select(-data) %>% 
+  unnest() %>%
+  arrange(desc(mean_ti)) %>% 
+  filter(row_number() == 1)
+
 
 
 
@@ -355,8 +396,10 @@ if(isTRUE(cond_canicula)){
     geom_vline(data = left_maximum, mapping=aes(xintercept=julian), color='blue') +
     geom_vline(data = posible_minimo, mapping=aes(xintercept=julian), color='red') +
     geom_vline(data = End_canicula, mapping=aes(xintercept=julian), color='green') +
-    geom_vline(xintercept = 220) +
-    geom_smooth(data = test1, aes(julian, mov))
+    geom_vline(data = second_max, mapping=aes(xintercept=julian)) +
+    geom_smooth(data = test1, aes(julian, mov)) +
+    labs(x = 'Julian day', y = 'Triangular Moving Average (mm)') + 
+    theme_light()
   
 }else{
   
@@ -368,61 +411,23 @@ if(isTRUE(cond_canicula)){
 
 
 
-test1 %>% 
-  mutate(ti = (mov - lag(mov)) /mov) %>% 
-  ggplot(.)  +
-  geom_line(aes(julian, ti))
-  # End_canicula <- 
-    
+
+
+     
 
 
 
 
 
 
-End <- test1 %>%
-  filter(Local ==2) %>%
-  filter(date >= date_minimo + 5) %>%
-  top_n(4, wt = mov) %>%
-  arrange(desc(mov)) %>%
-  filter(row_number() <= 3) 
+
     
     
 
 
 
     
-End %>% 
-    mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
-    filter(pendiente >= 0.20) %>% 
-    arrange(desc(mov)) %>%
-    filter(row_number()==1)
-  
 
-
-date_minimo
-End
-
-
-proof <- cbind(date_minimo, End) %>% 
-  as.tbl() %>% 
-  dplyr::select(date_minimo, date, julian) %>% 
-  nest(- julian )
-
-
-proof %>% 
-  select(data) %>% unnest
-
-proof %>%
-  mutate(increments = purrr::map(.x = data, .f = function(.x){
-    # .x <- proof %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
-    test1 %>% 
-      mutate(ti = (mov - lag(mov))/mov) %>%
-      filter(between(date, .x$date_minimo  + 5, .x$date)) %>% 
-      summarise(acum_ti = sum(ti), mean_ti = mean(ti), median_ti = median(ti))
-  }) ) %>% 
-  dplyr::select(-data) %>% 
-  unnest()
   
 
 
