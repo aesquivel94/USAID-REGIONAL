@@ -20,6 +20,7 @@ library(ncdf4)
 library(raster)
 library(lubridate)
 library(pracma)
+library(cowsay)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 
 
@@ -114,18 +115,26 @@ id_year_prec <- Prec_table %>%
 # i=2.
 
 
-# Fix
+MSD_id_Year <- function(id, pixel_yearT){
 
-
-MSD_id_Year <- function(){
   
-  
+  # pixel_yearT <- id_year_prec %>%
+  #   filter(year == 1987, id ==94) %>%
+  #   # filter(row_number() == 157) %>% 
+  #   dplyr::select(data) %>%
+  #   unnest()
+  # 
+  # id <- id_year_prec %>%
+  #   filter(year == 1987, id ==94) %>%
+  #   dplyr::select(id) %>%
+  #   # filter(row_number() == 157) %>%
+  #   unique() %>%
+  #   as.numeric()
   
   # First select id and year data set and 
   # create variable Local (define if it's or not local min-max).
-  pixel_yearT <- id_year_prec %>% 
-    filter(id == i, year == 2003) %>% 
-    unnest() %>% 
+  pixel_yearT <-    pixel_yearT  %>% 
+    mutate(id = id) %>% 
     filter(month %in% 5:10) %>% 
     mutate(Local = case_when(
       lag(mov) > mov & lead(mov) > mov ~ 1, 
@@ -133,9 +142,12 @@ MSD_id_Year <- function(){
       TRUE ~ 0  ) )
   
   
-  # =-=-=-=
-  # I guess in this part we need to do the big function. 
-  # =-=-=-=
+  
+  print( pixel_yearT %>% 
+    filter(row_number() == 1) %>% 
+    dplyr::select(date, id) )
+  
+  
   
   
   # Compute the first local max in the data.
@@ -145,8 +157,6 @@ MSD_id_Year <- function(){
     pull(julian)
   
   
-  
-  
   # Dates would be possible start MSD.
   init_canicula <- pixel_yearT %>%
     filter(Local ==2) %>%
@@ -154,8 +164,6 @@ MSD_id_Year <- function(){
     top_n(4, wt = mov) %>%
     arrange(desc(mov)) %>%
     filter(row_number() <= 3)
-  
-  
   
   
   # Last date would be possible MSD. 
@@ -171,12 +179,11 @@ MSD_id_Year <- function(){
   
   
   # =-=-=-=-=-=-=-=-=-=-=-= Function. 
-  
   #  This function compute a Min local min. 
   next_minimum <- function(x, fecha){
     
-    ## x <- pixel_yearT
-    ## fecha <- dates_canicula
+    # x <- pixel_yearT
+    # fecha <- dates_canicula
     y <- data_frame(date = fecha, date1 = fecha) %>%
       complete(date, date1) %>%
       mutate(diff_length = time_length(date - date1, unit = "day")) %>%
@@ -227,14 +234,11 @@ MSD_id_Year <- function(){
       filter(row_number()==1)
     
     return(result) }
-  
   # =-=-=-=-=-=-=-=-=-=-=-= 
-  
-  
+
   
   # In this point we compute the Local min. 
   posible_minimo <- next_minimum(x = pixel_yearT, fecha = dates_canicula)
-  
   
   
   # This point we compute if the Local min is in a establish limits. 
@@ -245,9 +249,7 @@ MSD_id_Year <- function(){
   
   
   # =-=-=-=-=-=-=-=-=-=-=-= Function. 
-  
   # Function to do start MSD. This it's the first maximum.
-  
   left_max_MSD <- function(Possible_dates, MinDate){
     
     # Possible_dates <- init_canicula
@@ -280,23 +282,19 @@ MSD_id_Year <- function(){
     left_maximum <- inner_join(Possible_dates, left_maximum, by = c('date' = 'maximo')) %>%
       mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
       filter(pendiente >= 0.20) %>%
-      arrange(desc(mov)) %>%
-      # dplyr::select(pendiente) %>%
-      # summarise(mean())
+      arrange(desc(mov)) %>% 
       filter(row_number()==1)
     
     
+    
+    
+    
     return(left_maximum)}
-  
   # =-=-=-=-=-=-=-=-=-=-=-= 
   
-  # In this point we compute the start MSD. 
-  left_start <- left_max_MSD(Possible_dates = init_canicula, MinDate =  posible_minimo)
   
 
-  
   # =-=-=-=-=-=-=-=-=-=-=-= Function. 
-  
   # Try to do second max. 
   right_max_MSD <- function(pyT, MinDate){
     # pyT <- pixel_yearT
@@ -320,6 +318,8 @@ MSD_id_Year <- function(){
       arrange(desc(pendiente)) %>% 
       filter(row_number() == 1) %>% 
       dplyr::select(-pendiente)
+    
+    
     
     
     second_max <- End %>% 
@@ -348,20 +348,11 @@ MSD_id_Year <- function(){
       mutate(type = c('End', 'End2'))
     
     return(second_max)}
-  
   # =-=-=-=-=-=-=-=-=-=-=-= 
   
-  right_End <- right_max_MSD(pyT = pixel_yearT, MinDate = posible_minimo)
-  
-  
-  
-  # Create MDS Index.
-  
-  MSD <- bind_rows(left_start, posible_minimo, right_End) %>% 
-    dplyr::select(-minimo, -day, -pendiente) %>% 
-    mutate(type = c('Start', 'Min', 'End', 'End2'))
-  
-  
+
+  # =-=-=-=-=-=-=-=-=-=-=-= Function. 
+  # MSD index canicula 
   MSD_index <- function(pyT, canicula){
     # pyT <- pixel_yearT
     # canicula <- MSD
@@ -391,12 +382,28 @@ MSD_id_Year <- function(){
     
     
     return(MSD_I)}
+  # =-=-=-=-=-=-=-=-=-=-=-= 
   
   
   
   
+  # In this point we compute the start MSD. 
+  left_start <- left_max_MSD(Possible_dates = init_canicula, MinDate =  posible_minimo)
   
-  if(isTRUE(cond_canicula)){
+ 
+  
+  if(isTRUE(cond_canicula) &  nrow(left_start) != 0){
+  
+    right_End <- right_max_MSD(pyT = pixel_yearT, MinDate = posible_minimo)
+    
+    # Create MDS Index.
+    MSD <- bind_rows(left_start, posible_minimo, right_End) %>% 
+      dplyr::select(-minimo, -day, -pendiente) %>% 
+      mutate(type = c('Start', 'Min', 'End', 'End2'))
+    
+    
+    
+    
     p <- ggplot() + 
       geom_line(data = pixel_yearT, aes(julian, mov)) + 
       # geom_line(aes(julian, prec)) +
@@ -407,6 +414,7 @@ MSD_id_Year <- function(){
       labs(x = 'Julian day', y = 'Triangular Moving Average (mm)') + 
       theme_light()
     
+    
     MSD_R <- MSD_index(pyT = pixel_yearT, canicula = MSD)
     
     print(p)
@@ -416,39 +424,31 @@ MSD_id_Year <- function(){
     cowsay::say("Lo sentimos, Jeferson esta probando otras metodologias", 
                 "smallcat", what_color = "blue")
     
-    
-    MSD_R <- MSD %>% 
+    MSD_R <- pixel_yearT %>% 
       filter(row_number() == 1) %>% 
       dplyr::select(id, x, y) %>% 
       mutate(Min = -999, Start = -999, End = -999, End_P = -999, 
              Length = -999, Intensity = -999, Magnitude = -999)
-    
   }
 
-  # print(MSD_R)
-}
+
+return(MSD_R)}
 
 
 
+# =-=-=-=-=
 
-
- 
-
+tictoc::tic()
+MSD_data <- id_year_prec %>% 
+  # filter(row_number() == 157) %>% 
+  mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year)) # %>% 
+  # dplyr::select(-data) %>% 
+  # unnest()
+tictoc::toc()
 
      
 
 
-
-
-
-
-
-    
-    
-
-
-
-    
 
   
 
