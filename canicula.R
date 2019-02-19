@@ -222,9 +222,7 @@ next_minimum <- function(x, fecha){
 
 # =-=-=-=-=-=-=-=-=-=-=-= 
 
-
-
-
+ 
 
 # In this point we compute the Local min. 
 posible_minimo <- next_minimum(x = pixel_yearT, fecha = dates_canicula)
@@ -298,63 +296,66 @@ left_start <- left_max_MSD(Possible_dates = init_canicula, MinDate =  posible_mi
 right_max_MSD <- function(pyT, MinDate){
   # pyT <- pixel_yearT
   # MinDate <- posible_minimo
-  
-  
+
   # day when occur min local min. 
   date_minimo <- MinDate %>%
     dplyr::select(date) %>%
     pull
   
-  
-  # This object have the possibles end of MSD. 
   End <- pyT %>%
-    filter(Local ==2) %>%
-    filter(date >= date_minimo + 5) %>%
+    filter(Local ==2, date >= date_minimo + 5)  %>%
     top_n(4, wt = mov) %>%
-    arrange(desc(mov)) %>%
-    filter(row_number() <= 3) %>% 
-    mutate(pendiente = (mov - MinDate$mov)/mov) %>%
-    filter(pendiente >= 0.20) # %>%
-    # arrange(desc(mov)) %>%
-    # # dplyr::select(pendiente) %>%
-    # # summarise(mean())
-    # filter(row_number()==1)
+    arrange(desc(mov))  %>%
+    mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
+    filter(pendiente >= 0.20)  
   
-
- ############# Fix in this part...
-   
-  second_max <- cbind(date_minimo, End) %>% 
-    as.tbl() %>% 
-    dplyr::select(date_minimo, date, julian) %>% 
+  
+  
+  End_1 <- End %>% 
+    arrange(desc(pendiente)) %>% 
+    filter(row_number() == 1) %>% 
+    dplyr::select(-pendiente)
+  
+  
+  second_max <- End %>% 
+    mutate(date_minimo = date_minimo) %>% 
     nest(- julian ) %>%
-    mutate(increments = purrr::map(.x = data, .f = function(.x){
-      # .x <- proof %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
+    mutate(increments = purrr::map(.x = data, .f = function(.x){ # Aqui...
+      # .x <-pyT %>% filter(Local ==2, date >= date_minimo + 5) %>% top_n(4, wt = mov) %>%
+      #   arrange(desc(mov))  %>%  mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
+      #   filter(pendiente >= 0.20)  %>% mutate(date_minimo = date_minimo) %>%
+      #   nest(- julian ) %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
+
       pyT %>% 
         mutate(ti = (mov - lag(mov))/mov) %>%
         filter(between(date, .x$date_minimo  + 5, .x$date)) %>% 
         summarise(acum_ti = sum(ti), mean_ti = mean(ti), median_ti = median(ti))
     }) ) %>% 
-    dplyr::select(-data) %>% 
+    dplyr::select(-data)  %>% 
     unnest() %>%
     arrange(desc(mean_ti)) %>% 
-    filter(row_number() == 1)
-
-}
+    filter(row_number() == 1) 
+  
+ 
+  second_max <-   pyT %>% 
+    filter(julian ==  second_max %>% dplyr::select(julian) %>% as.numeric()) %>% 
+    bind_rows(End_1) %>% 
+    mutate(type = c('End', 'End2'))
+ 
+ return(second_max)}
 
 # =-=-=-=-=-=-=-=-=-=-=-= 
 
-
-
+right_End <- right_max_MSD(pyT = pixel_yearT, MinDate = posible_minimo)
 
 
 if(isTRUE(cond_canicula)){
   ggplot() + 
     geom_line(data = pixel_yearT, aes(julian, mov)) + 
     # geom_line(aes(julian, prec)) +
-    geom_vline(data = left_maximum, mapping=aes(xintercept=julian), color='blue') +
+    geom_vline(data = left_start, mapping=aes(xintercept=julian), color='blue') +
     geom_vline(data = posible_minimo, mapping=aes(xintercept=julian), color='red') +
-    # geom_vline(data = End_canicula, mapping=aes(xintercept=julian), color='green') +
-    geom_vline(data = second_max, mapping=aes(xintercept=julian)) +
+    geom_vline(data = right_End, mapping=aes(xintercept=julian)) +
     geom_smooth(data = pixel_yearT, aes(julian, mov)) +
     labs(x = 'Julian day', y = 'Triangular Moving Average (mm)') + 
     theme_light()
@@ -366,10 +367,45 @@ if(isTRUE(cond_canicula)){
 }
 
 
+# Create MDS Index.
+    
+ MSD <- bind_rows(left_start, posible_minimo, right_End) %>% 
+    dplyr::select(-minimo, -day, -pendiente) %>% 
+    mutate(type = c('Start', 'Min', 'End', 'End2'))
+  
+  
+    
 
+ 
+ MSD_index <- function(pyT, canicula){
+  # pyT <- pixel_yearT
+  # canicula <- MSD
+ 
+    
+ Length <- canicula$julian[3] - canicula$julian[1]
+ 
+ Intensity <- pyT %>% 
+   filter(between(julian, canicula$julian[1], canicula$julian[3])) %>% 
+   summarise(Intensity =  mean(prec)) %>% 
+   as.numeric()
+ 
+ Magnitude <- pyT %>% 
+   filter(julian == canicula$julian[2]) %>% 
+   dplyr::select(prec) %>% 
+   as.numeric()
 
-
-
+ 
+ 
+ MSD_I <- canicula %>% 
+   dplyr::select(id, x, y, julian) %>% 
+   filter(row_number() == 2) %>% 
+   rename(Min = 'julian') %>% 
+   bind_cols(.,  tibble(Start = canicula$julian[1], End = canicula$julian[3], End_P = canicula$julian[4],
+                        Length = Length, Intensity = Intensity, Magnitude = Magnitude) )
+ 
+ 
+ 
+return(MSD_I)}
 
      
 
