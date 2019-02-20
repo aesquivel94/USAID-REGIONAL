@@ -310,17 +310,14 @@ MSD_id_Year <- function(id, pixel_yearT){
       top_n(4, wt = mov) %>%
       arrange(desc(mov))  %>%
       mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
-      filter(pendiente >= 0.20)  
-    
-    
+      # filter(pendiente >= 0.20)  manana pienso que hacer aqui
+      filter(pendiente >= 0.15)
+      
     
     End_1 <- End %>% 
       arrange(desc(pendiente)) %>% 
       filter(row_number() == 1) %>% 
       dplyr::select(-pendiente)
-    
-    
-    
     
     second_max <- End %>% 
       mutate(date_minimo = date_minimo) %>% 
