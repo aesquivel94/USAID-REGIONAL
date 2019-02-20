@@ -21,6 +21,7 @@ library(raster)
 library(lubridate)
 library(pracma)
 library(cowsay)
+library(sf)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 
 
@@ -46,7 +47,7 @@ HM_shp <-  getData('GADM', country='HN', level=0)
 # Read all Chirps bands and crop by shp file (country). 
 HND <- stack(route) %>% 
   flip(1) %>% 
-  crop(., HM_shp) %>% 
+  crop(., HM_shp)  %>% 
   mask(., HM_shp)
 
 
@@ -115,6 +116,7 @@ id_year_prec <- Prec_table %>%
 # i=2.
 
 
+
 MSD_id_Year <- function(id, pixel_yearT){
 
   
@@ -135,7 +137,7 @@ MSD_id_Year <- function(id, pixel_yearT){
   # create variable Local (define if it's or not local min-max).
   pixel_yearT <-    pixel_yearT  %>% 
     mutate(id = id) %>% 
-    filter(month %in% 5:10) %>% 
+    filter(month %in% 5:10) %>% # 
     mutate(Local = case_when(
       lag(mov) > mov & lead(mov) > mov ~ 1, 
       lead(mov) < mov & lag(mov) < mov ~ 2,
@@ -243,7 +245,7 @@ MSD_id_Year <- function(id, pixel_yearT){
   
   # This point we compute if the Local min is in a establish limits. 
   cond_canicula <- posible_minimo %>%
-    mutate(cond_midsummer = between(month, 6, 8)) %>%
+    mutate(cond_midsummer = between(month, 6, 9)) %>% # Mod
     pull(cond_midsummer)
   
   
@@ -281,7 +283,7 @@ MSD_id_Year <- function(id, pixel_yearT){
     # Aqui se hay un problema 
     left_maximum <- inner_join(Possible_dates, left_maximum, by = c('date' = 'maximo')) %>%
       mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
-      filter(pendiente >= 0.20) %>%
+      filter(pendiente >= 0.15) %>% # Mod
       arrange(desc(mov)) %>% 
       filter(row_number()==1)
     
@@ -311,7 +313,7 @@ MSD_id_Year <- function(id, pixel_yearT){
       arrange(desc(mov))  %>%
       mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
       # filter(pendiente >= 0.20)  manana pienso que hacer aqui
-      filter(pendiente >= 0.2)
+      filter(pendiente >= 0.15)
     
     
     End_1 <- End %>% 
@@ -443,14 +445,100 @@ MSD_data <- id_year_prec %>%
   # unnest()
 tictoc::toc() # 20.28867
 
-     
+    
 
+  
+# MSD_data %>% 
+#   dplyr::select(-data) %>% 
+#   unnest %>% 
+#   mutate(test = id == id1) %>% 
+#   summarise(a = sum(test)/nrow(.))
 
 
   
-MSD_data
+  
+MSD_data %>%
+  dplyr::select(-data, -id) %>%
+  unnest %>%
+  group_by(year) %>% 
+  summarise_at(vars(Min:Magnitude), .funs = function(x){round(sum(x == -999)/150, 2)}) %>% 
+  ggplot(aes(x =  year, y =  Min)) + 
+  geom_bar(stat = 'identity', fill = 'red') + 
+  geom_hline(yintercept = 0.3) + 
+  theme_bw() + 
+  labs(x = NULL, y = '% NA')
 
+
+
+
+
+
+# MSD_data %>%
+#   dplyr::select(-data, -id) %>%
+#   unnest %>%
+#   group_by(id) %>% 
+#   summarise_at(vars(Min:Magnitude), .funs = function(x){round(sum(x == -999)/150, 2)}) %>% 
+#   ggplot(aes(x =  id, y =  Min)) + 
+#   geom_bar(stat = 'identity', fill = 'red') + 
+#   geom_hline(yintercept = 0.3) + 
+#   theme_bw() + 
+#   labs(x = NULL, y = '% NA')
+
+
+
+
+
+
+
+
+MSD_data %>%
+  dplyr::select(-data, -id) %>%
+  unnest %>%
+  filter(year == 2018) %>% 
+  mutate(Intensity = ifelse(Intensity != -999, Intensity, NA)) %>%  
+  ggplot(aes(x, y, fill = Intensity)) +
+  geom_raster() + 
+  theme_bw() + 
+  labs(x = NULL, y = NULL)
+  
+  
+  
+# =-=-=-=-=-=-=-=
+shp <- st_as_sf(HM_shp) 
+
+
+a <- MSD_data %>%
+  dplyr::select(-data, -id) %>%
+  unnest %>%
+  group_by(id, x, y) %>% 
+  summarise(percent = round(sum(Start == -999)/37, 2))  %>% 
+  filter(percent < 0.3)
+
+  Honduras_art <- tibble(x = -c(87.65, 87.15, 87.22), y = c(13.29, 13.32,14.06)) 
+
+  ggplot(a) +
+  geom_raster(aes(x, y, fill = percent))  + 
+  scale_fill_gradient(low="blue", high="red") + 
+  geom_sf(data = shp, fill = NA, color = gray(.2)) +
+  theme_bw() + 
+  labs(x = NULL, y = NULL) + 
+  geom_point(data = Honduras_art, aes(x, y))
 
   
   
+ 
+  
+  
+
+
+# cond %in% c(6,8)
+# MSD_data_0 <- MSD_data
+
+
+# cond %in% c(5,9)
+# MSD_data_1 <- MSD_data
+
+# Cond (cambiando el max)
+# MSD_data_2 <-  MSD_data
+
 
