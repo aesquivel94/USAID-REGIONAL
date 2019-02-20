@@ -119,15 +119,15 @@ MSD_id_Year <- function(id, pixel_yearT){
 
   
   # pixel_yearT <- id_year_prec %>%
-  #   filter(year == 1987, id ==94) %>%
-  #   # filter(row_number() == 157) %>% 
+  #   # filter(year == 2008, id ==34) %>%
+  #   filter(row_number() == 2) %>%
   #   dplyr::select(data) %>%
   #   unnest()
   # 
   # id <- id_year_prec %>%
-  #   filter(year == 1987, id ==94) %>%
+  #   # filter(year == 2008, id ==34) %>%
   #   dplyr::select(id) %>%
-  #   # filter(row_number() == 157) %>%
+  #   filter(row_number() == 2) %>%
   #   unique() %>%
   #   as.numeric()
   
@@ -311,8 +311,8 @@ MSD_id_Year <- function(id, pixel_yearT){
       arrange(desc(mov))  %>%
       mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
       # filter(pendiente >= 0.20)  manana pienso que hacer aqui
-      filter(pendiente >= 0.15)
-      
+      filter(pendiente >= 0.2)
+    
     
     End_1 <- End %>% 
       arrange(desc(pendiente)) %>% 
@@ -338,11 +338,15 @@ MSD_id_Year <- function(id, pixel_yearT){
       arrange(desc(mean_ti)) %>% 
       filter(row_number() == 1) 
     
-    
-    second_max <-   pyT %>% 
-      filter(julian ==  second_max %>% dplyr::select(julian) %>% as.numeric()) %>% 
-      bind_rows(End_1) %>% 
-      mutate(type = c('End', 'End2'))
+    if(nrow(second_max) != 0){
+      second_max <-   pyT %>% 
+        filter(julian ==  second_max %>% dplyr::select(julian) %>% as.numeric()) %>% 
+        bind_rows(End_1) %>% 
+        mutate(type = c('End', 'End2'))
+      
+    } else{
+      second_max <- second_max 
+    }
     
     return(second_max)}
   # =-=-=-=-=-=-=-=-=-=-=-= 
@@ -386,35 +390,31 @@ MSD_id_Year <- function(id, pixel_yearT){
   
   # In this point we compute the start MSD. 
   left_start <- left_max_MSD(Possible_dates = init_canicula, MinDate =  posible_minimo)
+  right_End <- right_max_MSD(pyT = pixel_yearT, MinDate = posible_minimo)
   
  
   
-  if(isTRUE(cond_canicula) &  nrow(left_start) != 0){
-  
-    right_End <- right_max_MSD(pyT = pixel_yearT, MinDate = posible_minimo)
+  if(isTRUE(cond_canicula) &  nrow(left_start) != 0 &  nrow(right_End) != 0){
     
     # Create MDS Index.
     MSD <- bind_rows(left_start, posible_minimo, right_End) %>% 
       dplyr::select(-minimo, -day, -pendiente) %>% 
       mutate(type = c('Start', 'Min', 'End', 'End2'))
     
-    
-    
-    
-    p <- ggplot() + 
-      geom_line(data = pixel_yearT, aes(julian, mov)) + 
-      # geom_line(aes(julian, prec)) +
-      geom_vline(data = left_start, mapping=aes(xintercept=julian), color='blue') +
-      geom_vline(data = posible_minimo, mapping=aes(xintercept=julian), color='red') +
-      geom_vline(data = right_End, mapping=aes(xintercept=julian)) +
-      geom_smooth(data = pixel_yearT, aes(julian, mov)) +
-      labs(x = 'Julian day', y = 'Triangular Moving Average (mm)') + 
-      theme_light()
+    # p <- ggplot() + 
+    #   geom_line(data = pixel_yearT, aes(julian, mov)) + 
+    #   # geom_line(aes(julian, prec)) +
+    #   geom_vline(data = left_start, mapping=aes(xintercept=julian), color='blue') +
+    #   geom_vline(data = posible_minimo, mapping=aes(xintercept=julian), color='red') +
+    #   # geom_vline(data = right_End, mapping=aes(xintercept=julian)) +
+    #   geom_smooth(data = pixel_yearT, aes(julian, mov)) +
+    #   labs(x = 'Julian day', y = 'Triangular Moving Average (mm)') + 
+    #   theme_light()
     
     
     MSD_R <- MSD_index(pyT = pixel_yearT, canicula = MSD)
     
-    print(p)
+    # print(p)
     
   }else{
     
@@ -441,14 +441,14 @@ MSD_data <- id_year_prec %>%
   mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year)) # %>% 
   # dplyr::select(-data) %>% 
   # unnest()
-tictoc::toc()
+tictoc::toc() # 20.28867
 
      
 
 
 
   
-
+MSD_data
 
 
   
