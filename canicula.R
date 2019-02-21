@@ -537,12 +537,6 @@ a <- MSD_data %>%
 # =-=-=-=-=-=-=-=-=-=-=-=-=-= 
   
 
-cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/',sep = '\n')																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																	
-cat('cpt:nfield=1',sep = '\n')																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																															
-#cat('cpt:field=prcp, cpt:nrow=37, cpt:ncol=150, cpt:col=index, cpt:row=T, cpt:units=mm;cpt:missing=-999', sep = '\n') 
-#cat(write.table(.x, sep = '\t', col.names = FALSE, row.names = FALSE, na = "")) 
-
-
 names <-  MSD_data %>% 
   dplyr::select(-id, -data) %>% 
   unnest %>% 
@@ -552,15 +546,76 @@ names <-  MSD_data %>%
   add_row(id = '', .before = 1)
 
   
-MSD_data %>% 
+
+Length_CPT <- MSD_data %>% 
   dplyr::select(-id, -data) %>% 
   unnest %>% 
   dplyr::select(year, id, Length) %>% 
-  spread(key = id, value = Length) %>% 
-  setNames(names)
+  spread(key = id, value = Length) # %>% 
+  # setNames(names)
+
   
   
+Lat_Long  <- MSD_data %>% 
+  dplyr::select(-id, -data) %>% 
+  unnest %>% 
+  dplyr::select(x, y) %>% 
+  unique %>% 
+  t() 
+  # tibble(year = c('x', 'y'), . )
+
+
+
+# dim(Lat_Long)
+colnames(Lat_Long) <- paste0(1:150)
+rownames(Lat_Long) <- NULL
+
   
+Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
   
+names(Lat_Long) <- c('', paste0('V',1:150))
+names(Length_CPT) <- c('', paste0('V',1:150))
   
 
+# names(Length_CPT) <- colnames(Lat_Long)
+
+# SST_filter %>%
+#   filter(row_number() == 1) %>% 
+#   setNames(names(spread_layer)) %>%
+#   mutate_if(is.factor, as.character) %>% 
+#   mutate_if(is.character, as.numeric)
+
+
+  # set_names(paste0('V', names(.)))  
+  # bind_rows(Lat_Long,. )
+
+
+
+Length_CPT <- Length_CPT %>% 
+  rbind(Lat_Long, .) 
+
+
+
+write_cpt <- function(x, file){
+
+  year <- dplyr::select(x, date)  %>%
+    filter(row_number() == 1) %>%
+    as.character()
+
+  x <- dplyr::select(x, -id, -date) %>%
+    filter(row_number() == 1) %>%
+    unnest
+
+  
+  file <- 
+  
+
+  sink(file = file)
+  cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
+  cat('cpt:nfields=1', sep = '\n')
+  # cat('cpt:field=ssta, cpt:T=1982-03/05, cpt:nrow=61, cpt:ncol=360, cpt:row=Y, cpt:col=X, cpt:units=Kelvin_scale, cpt:missing=-999', sep = '\n')
+  cat(glue('cpt:field=ssta, cpt:T={year}, cpt:nrow=61, cpt:ncol=360, cpt:row=Y, cpt:col=X, cpt:units=Kelvin_scale, cpt:missing=-999'), sep = '\n')
+  cat(write.table(x, sep = '\t', col.names = FALSE, row.names = FALSE, na = ""))
+  sink()
+
+}
