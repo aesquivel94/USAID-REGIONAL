@@ -115,9 +115,7 @@ id_year_prec <- Prec_table %>%
 # Before the last local minimum. we shouldn't have local maximum
 # i=2.
 
-
-
-MSD_id_Year <- function(id, pixel_yearT){
+MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
 
   
   # pixel_yearT <- id_year_prec %>%
@@ -147,7 +145,8 @@ MSD_id_Year <- function(id, pixel_yearT){
   
   print( pixel_yearT %>% 
     filter(row_number() == 1) %>% 
-    dplyr::select(date, id) )
+    dplyr::select(date, id) %>% 
+      mutate(month_min = month_min, tolerance = tolerance))
   
   
   
@@ -162,7 +161,7 @@ MSD_id_Year <- function(id, pixel_yearT){
   # Dates would be possible start MSD.
   init_canicula <- pixel_yearT %>%
     filter(Local ==2) %>%
-    filter(julian >=first_maximum, julian <225) %>%
+    filter(julian >=first_maximum, julian < 225) %>%
     top_n(4, wt = mov) %>%
     arrange(desc(mov)) %>%
     filter(row_number() <= 3)
@@ -245,14 +244,14 @@ MSD_id_Year <- function(id, pixel_yearT){
   
   # This point we compute if the Local min is in a establish limits. 
   cond_canicula <- posible_minimo %>%
-    mutate(cond_midsummer = between(month, 6, 9)) %>% # Mod
+    mutate(cond_midsummer = between(month, 6, month_min)) %>% # Mod
     pull(cond_midsummer)
   
   
   
   # =-=-=-=-=-=-=-=-=-=-=-= Function. 
   # Function to do start MSD. This it's the first maximum.
-  left_max_MSD <- function(Possible_dates, MinDate){
+  left_max_MSD <- function(Possible_dates, MinDate, tolerance){
     
     # Possible_dates <- init_canicula
     # MinDate <- posible_minimo
@@ -283,7 +282,7 @@ MSD_id_Year <- function(id, pixel_yearT){
     # Aqui se hay un problema 
     left_maximum <- inner_join(Possible_dates, left_maximum, by = c('date' = 'maximo')) %>%
       mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
-      filter(pendiente >= 0.15) %>% # Mod
+      filter(pendiente >= tolerance) %>% # Mod
       arrange(desc(mov)) %>% 
       filter(row_number()==1)
     
@@ -298,7 +297,7 @@ MSD_id_Year <- function(id, pixel_yearT){
 
   # =-=-=-=-=-=-=-=-=-=-=-= Function. 
   # Try to do second max. 
-  right_max_MSD <- function(pyT, MinDate){
+  right_max_MSD <- function(pyT, MinDate, tolerance){
     # pyT <- pixel_yearT
     # MinDate <- posible_minimo
     
@@ -313,7 +312,7 @@ MSD_id_Year <- function(id, pixel_yearT){
       arrange(desc(mov))  %>%
       mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
       # filter(pendiente >= 0.20)  manana pienso que hacer aqui
-      filter(pendiente >= 0.15)
+      filter(pendiente >= tolerance)
     
     
     End_1 <- End %>% 
@@ -391,8 +390,8 @@ MSD_id_Year <- function(id, pixel_yearT){
   
   
   # In this point we compute the start MSD. 
-  left_start <- left_max_MSD(Possible_dates = init_canicula, MinDate =  posible_minimo)
-  right_End <- right_max_MSD(pyT = pixel_yearT, MinDate = posible_minimo)
+  left_start <- left_max_MSD(Possible_dates = init_canicula, MinDate =  posible_minimo, tolerance = tolerance)
+  right_End <- right_max_MSD(pyT = pixel_yearT, MinDate = posible_minimo, tolerance = tolerance)
   
  
   
@@ -440,7 +439,8 @@ return(MSD_R)}
 tictoc::tic()
 MSD_data <- id_year_prec %>% 
   # filter(row_number() == 157) %>% 
-  mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year)) # %>% 
+  mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year, 
+                           month_min = 9, tolerance = 0.2)) # %>% 
   # dplyr::select(-data) %>% 
   # unnest()
 tictoc::toc() # 20.28867
@@ -507,6 +507,11 @@ MSD_data %>%
 shp <- st_as_sf(HM_shp) 
 
 
+dry_C <- read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Honduras_Corredor_Seco.shp') 
+
+
+Honduras_art <- tibble(x = -c(87.65, 87.15, 87.22), y = c(13.29, 13.32,14.06)) 
+
 a <- MSD_data %>%
   dplyr::select(-data, -id) %>%
   unnest %>%
@@ -514,12 +519,12 @@ a <- MSD_data %>%
   summarise(percent = round(sum(Start == -999)/37, 2))  %>% 
   filter(percent < 0.3)
 
-  Honduras_art <- tibble(x = -c(87.65, 87.15, 87.22), y = c(13.29, 13.32,14.06)) 
 
   ggplot(a) +
   geom_raster(aes(x, y, fill = percent))  + 
   scale_fill_gradient(low="blue", high="red") + 
   geom_sf(data = shp, fill = NA, color = gray(.2)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.2)) + 
   theme_bw() + 
   labs(x = NULL, y = NULL) + 
   geom_point(data = Honduras_art, aes(x, y))
@@ -527,18 +532,35 @@ a <- MSD_data %>%
   
   
  
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Do CPT file.
+# =-=-=-=-=-=-=-=-=-=-=-=-=-= 
+  
+
+cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/',sep = '\n')																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																	
+cat('cpt:nfield=1',sep = '\n')																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																															
+#cat('cpt:field=prcp, cpt:nrow=37, cpt:ncol=150, cpt:col=index, cpt:row=T, cpt:units=mm;cpt:missing=-999', sep = '\n') 
+#cat(write.table(.x, sep = '\t', col.names = FALSE, row.names = FALSE, na = "")) 
+
+
+names <-  MSD_data %>% 
+  dplyr::select(-id, -data) %>% 
+  unnest %>% 
+  dplyr::select(id) %>% 
+  unique %>% 
+  mutate(id = paste0('V', id)) %>% 
+  add_row(id = '', .before = 1)
+
+  
+MSD_data %>% 
+  dplyr::select(-id, -data) %>% 
+  unnest %>% 
+  dplyr::select(year, id, Length) %>% 
+  spread(key = id, value = Length) %>% 
+  setNames(names)
   
   
-
-
-# cond %in% c(6,8)
-# MSD_data_0 <- MSD_data
-
-
-# cond %in% c(5,9)
-# MSD_data_1 <- MSD_data
-
-# Cond (cambiando el max)
-# MSD_data_2 <-  MSD_data
-
+  
+  
+  
 
