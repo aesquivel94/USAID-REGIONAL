@@ -537,13 +537,13 @@ a <- MSD_data %>%
 # =-=-=-=-=-=-=-=-=-=-=-=-=-= 
   
 
-names <-  MSD_data %>% 
-  dplyr::select(-id, -data) %>% 
-  unnest %>% 
-  dplyr::select(id) %>% 
-  unique %>% 
-  mutate(id = paste0('V', id)) %>% 
-  add_row(id = '', .before = 1)
+# names <-  MSD_data %>% 
+#   dplyr::select(-id, -data) %>% 
+#   unnest %>% 
+#   dplyr::select(id) %>% 
+#   unique %>% 
+#   mutate(id = paste0('V', id)) %>% 
+#   add_row(id = '', .before = 1)
 
   
 
@@ -591,27 +591,28 @@ names(Length_CPT) <- c('', paste0('V',1:150))
 
 
 
-Length_CPT <- Length_CPT %>% 
+x <- Length_CPT %>% 
+  mutate_if(is.factor, as.character) %>% 
+  mutate_if(is.character, as.numeric)  %>%
   rbind(Lat_Long, .) 
 
 
 
-write_cpt <- function(x, file){
+# write_cpt <- function(x, file){
 
   # year <- dplyr::select(x, date)  %>%
   #   filter(row_number() == 1) %>%
   #   as.character()
   # 
-  x <- Length_CPT
+  # x <- x
   file <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/Lenght.txt'
   
 
   sink(file = file)
   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
   cat('cpt:nfield=1', sep = '\n')
-  # cat('cpt:field=ssta, cpt:T=1982-03/05, cpt:nrow=61, cpt:ncol=360, cpt:row=Y, cpt:col=X, cpt:units=Kelvin_scale, cpt:missing=-999', sep = '\n')
-  cat(glue("cpt:field=days, cpt:nrow=37, cpt:ncol=151, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
-  cat(write.table(x, sep = '\t', col.names = FALSE, row.names = FALSE, na = ""))
+  cat(glue("cpt:field=days, cpt:nrow=37, cpt:ncol=150, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
+  cat(write.table(x, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
   sink()
 
-}
+# }
