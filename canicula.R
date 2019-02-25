@@ -22,7 +22,13 @@ library(lubridate)
 library(pracma)
 library(cowsay)
 library(sf)
+library(skimr)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+
+
+# =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+# Chirps data.
+# =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 
 
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
@@ -31,8 +37,8 @@ library(sf)
 
 # Chirps path
 route <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/station_data/grilled/data.nc'
-
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+
 
 
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
@@ -41,7 +47,7 @@ route <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/station_data
 
 # We Get shp data, if you want other country change country,
 # you would find code in: http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html. 
-HM_shp <-  getData('GADM', country='HN', level=0)
+HM_shp <-  getData('GADM', country='HN', level=1)
 # plot(HM_shp)
 
 # Read all Chirps bands and crop by shp file (country). 
@@ -115,9 +121,204 @@ id_year_prec <- Prec_table %>%
 # Before the last local minimum. we shouldn't have local maximum
 # i=2.
 
+
+# =-=-=-=-=-=-=-=-=-=-=-= Function ---- next_minimum. 
+#  This function compute a Min local min. 
+next_minimum <- function(x, fecha){
+  
+  # x <- pixel_yearT
+  # fecha <- dates_canicula
+  y <- data_frame(date = fecha, date1 = fecha) %>%
+    complete(date, date1) %>%
+    mutate(diff_length = time_length(date - date1, unit = "day")) %>%
+    filter(diff_length < 0) %>%
+    group_by(date) %>%
+    filter(row_number()==1) %>%
+    ungroup() %>%
+    mutate(id = 1:nrow(.)) %>%
+    dplyr::select(-diff_length) %>%
+    nest(-id) %>%
+    dplyr::select(-id) %>%
+    unlist(recursive = F)
+  
+  split_date <- function(x){
+    
+    x %>%
+      mutate(id = 1) %>%
+      gather(date, value, -id) %>%
+      pull(value)
+  }
+  
+  dates_filter <- purrr::map(.x = y, .f = split_date)
+  
+  
+  # If don't find local min in the window, that retuns data frame like: 
+  # year    id layer date       julian month     x     y  prec   mov Local
+  
+  return_df <- function(fecha, x){
+    # pixel_yearT %>%
+    # filter(between(date, dates_filter[[1]][1], dates_filter[[1]][2]))
+    
+    x %>%
+      filter(between(date, fecha[1], fecha[2])) %>%
+      filter(Local ==1)
+    
+  }
+  
+  minimos <- purrr::map(.x = dates_filter, .f = return_df, x)
+  
+  result <- purrr::map(.x = minimos, .f = function(x){
+    
+    x %>%
+      arrange(mov) %>%
+      filter(row_number()==1)
+  }) %>%
+    bind_rows() %>%
+    arrange(mov) %>%
+    filter(row_number()==1)
+  
+  return(result) }
+# =-=-=-=-=-=-=-=-=-=-=-= 
+
+# =-=-=-=-=-=-=-=-=-=-=-= Function  ---- left_max_MSD.
+# Function to do start MSD. This it's the first maximum.
+left_max_MSD <- function(Possible_dates, MinDate, tolerance){
+  
+  # Possible_dates <- init_canicula
+  # MinDate <- posible_minimo
+  
+  
+  # day when occur min local min. 
+  date_minimo <- MinDate %>%
+    dplyr::select(date) %>%
+    pull
+  
+  
+  # find the possible start canicula. 
+  left_maximum <- Possible_dates %>%
+    filter(date < date_minimo - 5)
+  
+  # dates to find posibble start canicula.
+  date_maximo <- left_maximum %>%
+    dplyr::select(date) %>%
+    pull
+  
+  # Compute the difference of the days with the min local min. 
+  left_maximum <- tibble(minimo = date_minimo, maximo = date_maximo) %>%
+    mutate(day = time_length(maximo - minimo, "day")) %>%
+    arrange(desc(day))
+  # filter(row_number()==1)
+  
+  
+  # Aqui se hay un problema 
+  left_maximum <- inner_join(Possible_dates, left_maximum, by = c('date' = 'maximo')) %>%
+    mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
+    filter(pendiente >= tolerance) %>% # Mod
+    arrange(desc(mov)) %>% 
+    filter(row_number()==1)
+  
+  
+  return(left_maximum)}
+# =-=-=-=-=-=-=-=-=-=-=-= 
+
+
+# =-=-=-=-=-=-=-=-=-=-=-= Function  ---- right_max_MSD.
+# Try to do second max. 
+right_max_MSD <- function(pyT, MinDate, tolerance){
+  # pyT <- pixel_yearT
+  # MinDate <- posible_minimo
+  
+  # day when occur min local min. 
+  date_minimo <- MinDate %>%
+    dplyr::select(date) %>%
+    pull
+  
+  End <- pyT %>%
+    filter(Local ==2, date >= date_minimo + 5)  %>%
+    top_n(4, wt = mov) %>%
+    arrange(desc(mov))  %>%
+    mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
+    # filter(pendiente >= 0.20)  manana pienso que hacer aqui
+    filter(pendiente >= tolerance)
+  
+  
+  End_1 <- End %>% 
+    arrange(desc(pendiente)) %>% 
+    filter(row_number() == 1) %>% 
+    dplyr::select(-pendiente)
+  
+  second_max <- End %>% 
+    mutate(date_minimo = date_minimo) %>% 
+    nest(- julian ) %>%
+    mutate(increments = purrr::map(.x = data, .f = function(.x){ # Aqui...
+      # .x <-pyT %>% filter(Local ==2, date >= date_minimo + 5) %>% top_n(4, wt = mov) %>%
+      #   arrange(desc(mov))  %>%  mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
+      #   filter(pendiente >= 0.20)  %>% mutate(date_minimo = date_minimo) %>%
+      #   nest(- julian ) %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
+      
+      pyT %>% 
+        mutate(ti = (mov - lag(mov))/mov) %>%
+        filter(between(date, .x$date_minimo  + 5, .x$date)) %>% 
+        summarise(acum_ti = sum(ti), mean_ti = mean(ti), median_ti = median(ti))
+    }) ) %>% 
+    dplyr::select(-data)  %>% 
+    unnest() %>%
+    arrange(desc(mean_ti)) %>% 
+    filter(row_number() == 1) 
+  
+  if(nrow(second_max) != 0){
+    second_max <-   pyT %>% 
+      filter(julian ==  second_max %>% dplyr::select(julian) %>% as.numeric()) %>% 
+      bind_rows(End_1) %>% 
+      mutate(type = c('End', 'End2'))
+    
+  } else{
+    second_max <- second_max 
+  }
+  
+  return(second_max)}
+# =-=-=-=-=-=-=-=-=-=-=-= 
+
+
+# =-=-=-=-=-=-=-=-=-=-=-= Function  ---- MSD index. 
+# MSD index canicula 
+MSD_index <- function(pyT, canicula){
+  # pyT <- pixel_yearT
+  # canicula <- MSD
+  
+  
+  Length <- canicula$julian[3] - canicula$julian[1]
+  
+  Intensity <- pyT %>% 
+    filter(between(julian, canicula$julian[1], canicula$julian[3])) %>% 
+    summarise(Intensity =  mean(prec)) %>% 
+    as.numeric()
+  
+  Magnitude <- pyT %>% 
+    filter(julian == canicula$julian[2]) %>% 
+    dplyr::select(prec) %>% 
+    as.numeric()
+  
+  
+  
+  MSD_I <- canicula %>% 
+    dplyr::select(id, x, y, julian) %>% 
+    filter(row_number() == 2) %>% 
+    rename(Min = 'julian') %>% 
+    bind_cols(.,  tibble(Start = canicula$julian[1], End = canicula$julian[3], End_P = canicula$julian[4],
+                         Length = Length, Intensity = Intensity, Magnitude = Magnitude) )
+  
+  
+  
+  return(MSD_I)}
+# =-=-=-=-=-=-=-=-=-=-=-= 
+
+
+# =-=-=-=-=-=-=-=-=-=-=-= Function  ---- MSD_id_Year. 
+# This function do MSD for each id-year. 
+# For use this function is necesary next_minimum, left_max_MSD, right_max_MSD, MSD_index functions. 
 MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
 
-  
   # pixel_yearT <- id_year_prec %>%
   #   # filter(year == 2008, id ==34) %>%
   #   filter(row_number() == 2) %>%
@@ -142,12 +343,10 @@ MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
       TRUE ~ 0  ) )
   
   
-  
   print( pixel_yearT %>% 
     filter(row_number() == 1) %>% 
     dplyr::select(date, id) %>% 
       mutate(month_min = month_min, tolerance = tolerance))
-  
   
   
   
@@ -178,65 +377,7 @@ MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
     pull(date)
   
   
-  
-  # =-=-=-=-=-=-=-=-=-=-=-= Function. 
-  #  This function compute a Min local min. 
-  next_minimum <- function(x, fecha){
-    
-    # x <- pixel_yearT
-    # fecha <- dates_canicula
-    y <- data_frame(date = fecha, date1 = fecha) %>%
-      complete(date, date1) %>%
-      mutate(diff_length = time_length(date - date1, unit = "day")) %>%
-      filter(diff_length < 0) %>%
-      group_by(date) %>%
-      filter(row_number()==1) %>%
-      ungroup() %>%
-      mutate(id = 1:nrow(.)) %>%
-      dplyr::select(-diff_length) %>%
-      nest(-id) %>%
-      dplyr::select(-id) %>%
-      unlist(recursive = F)
-    
-    split_date <- function(x){
-      
-      x %>%
-        mutate(id = 1) %>%
-        gather(date, value, -id) %>%
-        pull(value)
-    }
-    
-    dates_filter <- purrr::map(.x = y, .f = split_date)
-    
-    
-    # If don't find local min in the window, that retuns data frame like: 
-    # year    id layer date       julian month     x     y  prec   mov Local
-    
-    return_df <- function(fecha, x){
-      # pixel_yearT %>%
-      # filter(between(date, dates_filter[[1]][1], dates_filter[[1]][2]))
-      
-      x %>%
-        filter(between(date, fecha[1], fecha[2])) %>%
-        filter(Local ==1)
-      
-    }
-    
-    minimos <- purrr::map(.x = dates_filter, .f = return_df, x)
-    
-    result <- purrr::map(.x = minimos, .f = function(x){
-      
-      x %>%
-        arrange(mov) %>%
-        filter(row_number()==1)
-    }) %>%
-      bind_rows() %>%
-      arrange(mov) %>%
-      filter(row_number()==1)
-    
-    return(result) }
-  # =-=-=-=-=-=-=-=-=-=-=-= 
-
+  # =-=-=-=-=-=-=-=-=-=-=-= Function ---- next_minimum. 
   
   # In this point we compute the Local min. 
   posible_minimo <- next_minimum(x = pixel_yearT, fecha = dates_canicula)
@@ -248,145 +389,11 @@ MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
     pull(cond_midsummer)
   
   
+  # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- left_max_MSD.
+ 
+  # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- right_max_MSD.
   
-  # =-=-=-=-=-=-=-=-=-=-=-= Function. 
-  # Function to do start MSD. This it's the first maximum.
-  left_max_MSD <- function(Possible_dates, MinDate, tolerance){
-    
-    # Possible_dates <- init_canicula
-    # MinDate <- posible_minimo
-    
-    
-    # day when occur min local min. 
-    date_minimo <- MinDate %>%
-      dplyr::select(date) %>%
-      pull
-    
-    
-    # find the possible start canicula. 
-    left_maximum <- Possible_dates %>%
-      filter(date < date_minimo - 5)
-    
-    # dates to find posibble start canicula.
-    date_maximo <- left_maximum %>%
-      dplyr::select(date) %>%
-      pull
-    
-    # Compute the difference of the days with the min local min. 
-    left_maximum <- tibble(minimo = date_minimo, maximo = date_maximo) %>%
-      mutate(day = time_length(maximo - minimo, "day")) %>%
-      arrange(desc(day))
-    # filter(row_number()==1)
-    
-    
-    # Aqui se hay un problema 
-    left_maximum <- inner_join(Possible_dates, left_maximum, by = c('date' = 'maximo')) %>%
-      mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
-      filter(pendiente >= tolerance) %>% # Mod
-      arrange(desc(mov)) %>% 
-      filter(row_number()==1)
-    
-    
-    
-    
-    
-    return(left_maximum)}
-  # =-=-=-=-=-=-=-=-=-=-=-= 
-  
-  
-
-  # =-=-=-=-=-=-=-=-=-=-=-= Function. 
-  # Try to do second max. 
-  right_max_MSD <- function(pyT, MinDate, tolerance){
-    # pyT <- pixel_yearT
-    # MinDate <- posible_minimo
-    
-    # day when occur min local min. 
-    date_minimo <- MinDate %>%
-      dplyr::select(date) %>%
-      pull
-    
-    End <- pyT %>%
-      filter(Local ==2, date >= date_minimo + 5)  %>%
-      top_n(4, wt = mov) %>%
-      arrange(desc(mov))  %>%
-      mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
-      # filter(pendiente >= 0.20)  manana pienso que hacer aqui
-      filter(pendiente >= tolerance)
-    
-    
-    End_1 <- End %>% 
-      arrange(desc(pendiente)) %>% 
-      filter(row_number() == 1) %>% 
-      dplyr::select(-pendiente)
-    
-    second_max <- End %>% 
-      mutate(date_minimo = date_minimo) %>% 
-      nest(- julian ) %>%
-      mutate(increments = purrr::map(.x = data, .f = function(.x){ # Aqui...
-        # .x <-pyT %>% filter(Local ==2, date >= date_minimo + 5) %>% top_n(4, wt = mov) %>%
-        #   arrange(desc(mov))  %>%  mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
-        #   filter(pendiente >= 0.20)  %>% mutate(date_minimo = date_minimo) %>%
-        #   nest(- julian ) %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
-        
-        pyT %>% 
-          mutate(ti = (mov - lag(mov))/mov) %>%
-          filter(between(date, .x$date_minimo  + 5, .x$date)) %>% 
-          summarise(acum_ti = sum(ti), mean_ti = mean(ti), median_ti = median(ti))
-      }) ) %>% 
-      dplyr::select(-data)  %>% 
-      unnest() %>%
-      arrange(desc(mean_ti)) %>% 
-      filter(row_number() == 1) 
-    
-    if(nrow(second_max) != 0){
-      second_max <-   pyT %>% 
-        filter(julian ==  second_max %>% dplyr::select(julian) %>% as.numeric()) %>% 
-        bind_rows(End_1) %>% 
-        mutate(type = c('End', 'End2'))
-      
-    } else{
-      second_max <- second_max 
-    }
-    
-    return(second_max)}
-  # =-=-=-=-=-=-=-=-=-=-=-= 
-  
-
-  # =-=-=-=-=-=-=-=-=-=-=-= Function. 
-  # MSD index canicula 
-  MSD_index <- function(pyT, canicula){
-    # pyT <- pixel_yearT
-    # canicula <- MSD
-    
-    
-    Length <- canicula$julian[3] - canicula$julian[1]
-    
-    Intensity <- pyT %>% 
-      filter(between(julian, canicula$julian[1], canicula$julian[3])) %>% 
-      summarise(Intensity =  mean(prec)) %>% 
-      as.numeric()
-    
-    Magnitude <- pyT %>% 
-      filter(julian == canicula$julian[2]) %>% 
-      dplyr::select(prec) %>% 
-      as.numeric()
-    
-    
-    
-    MSD_I <- canicula %>% 
-      dplyr::select(id, x, y, julian) %>% 
-      filter(row_number() == 2) %>% 
-      rename(Min = 'julian') %>% 
-      bind_cols(.,  tibble(Start = canicula$julian[1], End = canicula$julian[3], End_P = canicula$julian[4],
-                           Length = Length, Intensity = Intensity, Magnitude = Magnitude) )
-    
-    
-    
-    return(MSD_I)}
-  # =-=-=-=-=-=-=-=-=-=-=-= 
-  
-  
+  # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- MSD index. 
   
   
   # In this point we compute the start MSD. 
@@ -419,7 +426,7 @@ MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
     
   }else{
     
-    cowsay::say("Lo sentimos, Jeferson esta probando otras metodologias", 
+    cowsay::say("Sorry we couldn't find midsummer drought (canicula)!", 
                 "smallcat", what_color = "blue")
     
     MSD_R <- pixel_yearT %>% 
@@ -431,7 +438,7 @@ MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
 
 
 return(MSD_R)}
-
+# =-=-=-=-=-=-=-=-=-=-=-= 
 
 
 # =-=-=-=-=
@@ -440,23 +447,14 @@ tictoc::tic()
 MSD_data <- id_year_prec %>% 
   # filter(row_number() == 157) %>% 
   mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year, 
-                           month_min = 9, tolerance = 0.2)) # %>% 
+                           month_min = 8, tolerance = 0.2)) # %>% 
   # dplyr::select(-data) %>% 
   # unnest()
-tictoc::toc() # 20.28867
-
-    
-
-  
-# MSD_data %>% 
-#   dplyr::select(-data) %>% 
-#   unnest %>% 
-#   mutate(test = id == id1) %>% 
-#   summarise(a = sum(test)/nrow(.))
+tictoc::toc() # 24.7
 
 
-  
-  
+
+# Percent NA by year.  
 MSD_data %>%
   dplyr::select(-data, -id) %>%
   unnest %>%
@@ -470,36 +468,61 @@ MSD_data %>%
 
 
 
+#  Summary by year (for the most important variables. )
+MSD_data %>%
+  dplyr::select(-data, -id)  %>% 
+  unnest %>% 
+  na_if(-999) %>%
+  dplyr::select( year, Length, Intensity, Magnitude) %>% 
+  group_by(year) %>% 
+  skimr::skim(.)  
 
+
+
+
+
+library(gganimate)
+# =-=-=-=-=-=-=-=
+shp <- st_as_sf(HM_shp) 
+dry_C <- read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Honduras_Corredor_Seco.shp') 
+
+
+
+p_data  <- MSD_data %>%
+  dplyr::select(-data, -id)  %>% 
+  unnest %>% 
+  na_if(-999) %>% 
+  dplyr::select(year,  x, y, Intensity) %>% 
+  filter(between(year, 2015, 2018)) %>% 
+  mutate(year = as.integer(year)) 
+
+p_data %>% dplyr::select(year) %>% unique
+
+
+anim <-  ggplot(p_data) +
+  geom_tile(aes(x, y, fill = Intensity)) + 
+  scale_fill_viridis(na.value="white") + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() +
+  # Here comes the gganimate specific bits
+  labs(title = 'Year: {frame_time}', x = 'Longitud', y = 'Latitud') + 
+  transition_time(year) # +
+  # ease_aes('linear')
+
+
+animate(anim, renderer = sprite_renderer())
 
 
 # MSD_data %>%
 #   dplyr::select(-data, -id) %>%
 #   unnest %>%
-#   group_by(id) %>% 
-#   summarise_at(vars(Min:Magnitude), .funs = function(x){round(sum(x == -999)/150, 2)}) %>% 
-#   ggplot(aes(x =  id, y =  Min)) + 
-#   geom_bar(stat = 'identity', fill = 'red') + 
-#   geom_hline(yintercept = 0.3) + 
+#   filter(year == 2018) %>% 
+#   mutate(Intensity = ifelse(Intensity != -999, Intensity, NA)) %>%  
+#   ggplot(aes(x, y, fill = Intensity)) +
+#   geom_raster() + 
 #   theme_bw() + 
-#   labs(x = NULL, y = '% NA')
-
-
-
-
-
-
-
-
-MSD_data %>%
-  dplyr::select(-data, -id) %>%
-  unnest %>%
-  filter(year == 2018) %>% 
-  mutate(Intensity = ifelse(Intensity != -999, Intensity, NA)) %>%  
-  ggplot(aes(x, y, fill = Intensity)) +
-  geom_raster() + 
-  theme_bw() + 
-  labs(x = NULL, y = NULL)
+#   labs(x = NULL, y = NULL)
   
   
   
@@ -516,20 +539,52 @@ a <- MSD_data %>%
   dplyr::select(-data, -id) %>%
   unnest %>%
   group_by(id, x, y) %>% 
-  summarise(percent = round(sum(Start == -999)/37, 2))  %>% 
-  filter(percent < 0.3)
+  summarise(percent = round(sum(Start == -999)/37, 2)*100)   %>% 
+  filter(percent < 40)
 
 
+ # f <- 
+   
   ggplot(a) +
-  geom_raster(aes(x, y, fill = percent))  + 
-  scale_fill_gradient(low="blue", high="red") + 
-  geom_sf(data = shp, fill = NA, color = gray(.2)) +
-  geom_sf(data = dry_C, fill = NA, color = gray(.2)) + 
+  geom_tile(aes(x, y, fill = percent))  + 
+  scale_fill_viridis() + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
   theme_bw() + 
-  labs(x = NULL, y = NULL) + 
+  labs(x = NULL, y = NULL, fill = 'NA %') + 
   geom_point(data = Honduras_art, aes(x, y))
 
   
+ 
+ 
+ 
+ 
+ 
+
+ # prec
+ 
+ 
+ test <- id_year_prec %>% 
+   unnest %>% 
+   filter(between(month, 5, 10)) %>% 
+   group_by(id, x, y,  year) %>% 
+   summarise(acum = sum(prec)) %>% 
+   ungroup() %>% 
+   group_by(id, x, y) %>% 
+   summarise(mean = mean(acum))
+   
+   
+   ggplot(test , aes(x, y, fill = mean)) + 
+   geom_tile() +  
+   scale_fill_viridis() + 
+   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+   geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+   theme_bw() + 
+   labs(x = NULL, y = NULL, fill = 'NA %') + 
+   geom_point(data = Honduras_art, aes(x, y))
+ 
+ 
+ 
   
  
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -537,82 +592,72 @@ a <- MSD_data %>%
 # =-=-=-=-=-=-=-=-=-=-=-=-=-= 
   
 
-# names <-  MSD_data %>% 
-#   dplyr::select(-id, -data) %>% 
-#   unnest %>% 
-#   dplyr::select(id) %>% 
-#   unique %>% 
-#   mutate(id = paste0('V', id)) %>% 
-#   add_row(id = '', .before = 1)
+CPT_file <- function(data, var){
+ # data <- MSD_data
+ # var <- 'Intensity'
+  
+   CPT_data <- data %>% 
+    dplyr::select(-id, -data) %>% 
+    unnest %>% 
+    dplyr::select(year, id, !!var) %>% 
+    spread(key = id, value = !!var) 
+   
+  Lat_Long  <- data %>% 
+    dplyr::select(-id, -data) %>% 
+    unnest %>% 
+    dplyr::select(x, y) %>% 
+    unique %>% 
+    t() 
+
+  colnames(Lat_Long) <- paste0(1:150)
+  rownames(Lat_Long) <- NULL
+  
+  
+  Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
+  
+  names(Lat_Long) <- c('', paste0('V',1:150))
+  names(CPT_data) <- c('', paste0('V',1:150))
+
 
   
-
-Length_CPT <- MSD_data %>% 
-  dplyr::select(-id, -data) %>% 
-  unnest %>% 
-  dplyr::select(year, id, Length) %>% 
-  spread(key = id, value = Length) # %>% 
-  # setNames(names)
-
-  
-  
-Lat_Long  <- MSD_data %>% 
-  dplyr::select(-id, -data) %>% 
-  unnest %>% 
-  dplyr::select(x, y) %>% 
-  unique %>% 
-  t() 
-  # tibble(year = c('x', 'y'), . )
-
-
-
-# dim(Lat_Long)
-colnames(Lat_Long) <- paste0(1:150)
-rownames(Lat_Long) <- NULL
-
-  
-Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
-  
-names(Lat_Long) <- c('', paste0('V',1:150))
-names(Length_CPT) <- c('', paste0('V',1:150))
+  # =-=-=-=-=-=-=-=-=-=-=-=
+  CPT_data <- CPT_data %>% 
+    mutate_if(is.factor, as.character) %>% 
+    mutate_if(is.character, as.numeric)  %>%
+    rbind(Lat_Long, .) 
   
 
-# names(Length_CPT) <- colnames(Lat_Long)
-
-# SST_filter %>%
-#   filter(row_number() == 1) %>% 
-#   setNames(names(spread_layer)) %>%
-#   mutate_if(is.factor, as.character) %>% 
-#   mutate_if(is.character, as.numeric)
-
-
-  # set_names(paste0('V', names(.)))  
-  # bind_rows(Lat_Long,. )
-
-
-
-x <- Length_CPT %>% 
-  mutate_if(is.factor, as.character) %>% 
-  mutate_if(is.character, as.numeric)  %>%
-  rbind(Lat_Long, .) 
-
-
-
-# write_cpt <- function(x, file){
-
-  # year <- dplyr::select(x, date)  %>%
-  #   filter(row_number() == 1) %>%
-  #   as.character()
-  # 
-  # x <- x
-  file <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/Lenght.txt'
+  file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/', var, '.txt')
   
-
+  
   sink(file = file)
   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
   cat('cpt:nfield=1', sep = '\n')
   cat(glue("cpt:field=days, cpt:nrow=37, cpt:ncol=150, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
-  cat(write.table(x, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
+  cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
   sink()
 
-# }
+}  
+  
+# MSD_data %>% 
+#   dplyr::select(-id, -data) %>% 
+#   unnest   
+#  Var <- c(Length, Intensity, Magnitude)
+
+CPT_file(data = MSD_data, var = 'Length')
+CPT_file(data = MSD_data, var = 'Intensity')
+CPT_file(data = MSD_data, var = 'Magnitude')
+
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+# Station data.
+# =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+
+
+
+
