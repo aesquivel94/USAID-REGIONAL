@@ -122,6 +122,8 @@ id_year_prec <- Prec_table %>%
 # i=2.
 
 
+month_min <- 9;  tolerance <- 0.9
+
 # =-=-=-=-=-=-=-=-=-=-=-= Function ---- next_minimum. 
 #  This function compute a Min local min. 
 next_minimum <- function(x, fecha){
@@ -180,6 +182,7 @@ next_minimum <- function(x, fecha){
   return(result) }
 # =-=-=-=-=-=-=-=-=-=-=-= 
 
+
 # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- left_max_MSD.
 # Function to do start MSD. This it's the first maximum.
 left_max_MSD <- function(Possible_dates, MinDate, tolerance){
@@ -212,7 +215,7 @@ left_max_MSD <- function(Possible_dates, MinDate, tolerance){
   
   # Aqui se hay un problema 
   left_maximum <- inner_join(Possible_dates, left_maximum, by = c('date' = 'maximo')) %>%
-    mutate(pendiente = (mov - posible_minimo$mov)/mov) %>%
+    mutate(pendiente = (mov - MinDate$mov)/mov) %>%
     filter(pendiente >= tolerance) %>% # Mod
     arrange(desc(mov)) %>% 
     filter(row_number()==1)
@@ -317,7 +320,7 @@ MSD_index <- function(pyT, canicula){
 # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- MSD_id_Year. 
 # This function do MSD for each id-year. 
 # For use this function is necesary next_minimum, left_max_MSD, right_max_MSD, MSD_index functions. 
-MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
+MSD_id_Year <- function(id, pixel_yearT){
 
   # pixel_yearT <- id_year_prec %>%
   #   # filter(year == 2008, id ==34) %>%
@@ -341,7 +344,7 @@ MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
       lag(mov) > mov & lead(mov) > mov ~ 1, 
       lead(mov) < mov & lag(mov) < mov ~ 2,
       TRUE ~ 0  ) )
-  
+ 
   
   print( pixel_yearT %>% 
     filter(row_number() == 1) %>% 
@@ -355,7 +358,7 @@ MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
     filter(Local == 2) %>%
     filter(row_number()==1) %>%
     pull(julian)
-  
+
   
   # Dates would be possible start MSD.
   init_canicula <- pixel_yearT %>%
@@ -364,25 +367,28 @@ MSD_id_Year <- function(id, pixel_yearT, month_min, tolerance){
     top_n(4, wt = mov) %>%
     arrange(desc(mov)) %>%
     filter(row_number() <= 3)
-  
-  
+
+    
   # Last date would be possible MSD. 
   last_date <- pixel_yearT %>%
     filter(row_number() == n())
-  
-  
+
+    
   # Look for the next local minimun (including the end of the period). 
   dates_canicula <- init_canicula %>%
     bind_rows(last_date) %>%
     pull(date)
   
-  
+
   # =-=-=-=-=-=-=-=-=-=-=-= Function ---- next_minimum. 
+
   
   # In this point we compute the Local min. 
   posible_minimo <- next_minimum(x = pixel_yearT, fecha = dates_canicula)
-  
-  
+
+
+  # rm(pixel_yearT, id, init_canicula, first_maximum, last_date, dates_canicula, posible_minimo)
+   
   # This point we compute if the Local min is in a establish limits. 
   cond_canicula <- posible_minimo %>%
     mutate(cond_midsummer = between(month, 6, month_min)) %>% # Mod
@@ -445,9 +451,8 @@ return(MSD_R)}
 
 tictoc::tic()
 MSD_data <- id_year_prec %>% 
-  # filter(row_number() == 157) %>% 
-  mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year, 
-                           month_min = 8, tolerance = 0.2)) # %>% 
+  # filter(row_number() <5) %>% 
+  mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year)) # %>% 
   # dplyr::select(-data) %>% 
   # unnest()
 tictoc::toc() # 24.7
@@ -478,8 +483,10 @@ MSD_data %>%
   skimr::skim(.)  
 
 
-
-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Testing gganimate for do animation graphs.
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 library(gganimate)
 # =-=-=-=-=-=-=-=
@@ -511,7 +518,7 @@ anim <-  ggplot(p_data) +
   # ease_aes('linear')
 
 
-animate(anim, renderer = sprite_renderer())
+animate(anim, renderer = ffmpeg_renderer())
 
 
 # MSD_data %>%
@@ -524,15 +531,9 @@ animate(anim, renderer = sprite_renderer())
 #   theme_bw() + 
 #   labs(x = NULL, y = NULL)
   
-  
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-  
   
 # =-=-=-=-=-=-=-=
-shp <- st_as_sf(HM_shp) 
-
-
-dry_C <- read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Honduras_Corredor_Seco.shp') 
-
-
 Honduras_art <- tibble(x = -c(87.65, 87.15, 87.22), y = c(13.29, 13.32,14.06)) 
 
 a <- MSD_data %>%
@@ -659,5 +660,108 @@ CPT_file(data = MSD_data, var = 'Magnitude')
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 
 
+Station <- read_csv("station_data/Data_diaria_copeco/prec_daily_qc.csv") %>% 
+  filter(year > 1981) 
+
+Catalog <- read_csv("station_data/Data_diaria_copeco/stations_catalog_copeco.csv")
+
+ 
+# Summary station data
+Station %>% 
+  dplyr::select(-day, -month, -year) %>% 
+  skimr::skim(.) 
 
 
+ 
+# Lat and Long
+Catalog_M <- Catalog %>%  
+  mutate(national_code= str_replace(national_code, '-', '.')) %>%
+  mutate(station_N = ifelse(str_detect(national_code, 'SMN.HON'),
+                            glue::glue("{national_code}_{name_station}"), 
+                            glue::glue("X{national_code}_{name_station}")) ) %>%
+  dplyr::select(station_N, Lon, Lat)
+  
+
+
+
+
+# Data Filling with Chirps 
+
+
+# test <- id_year_prec %>%
+#   unnest %>% 
+#   dplyr::select(-layer, -julian, -mov) %>% 
+#   nest(-id, -x, -y) 
+
+
+# test$x
+# Catalog_M$Lon
+
+
+Station_Chirps <- raster::extract(HND, Catalog_M[ ,2:3]) %>% 
+  as_tibble() %>% 
+  bind_cols(Catalog_M, .) %>% 
+  gather(layer, Chirps, -station_N, -Lon, -Lat ) %>%
+  mutate(layer = str_remove(layer, 'X')) %>% 
+  nest(-station_N)
+
+
+# Function for do dates...
+do_dates <- function(Chirps_S){
+  # Chirps_S <- test %>% filter(station_N == 'SMN.HOND020_Galeras')
+  
+  data_dates <- Chirps_S %>%
+    mutate(date = Prec_table$date,  julian = yday(date), 
+           year = year(date), month = month(date))
+  
+return(data_dates)}
+
+
+# =-=-
+test <- Station_Chirps %>% 
+  mutate(Data_dates = purrr::map(.x = data, .f = do_dates)) %>%
+  dplyr::select(-data) %>%
+  unnest() 
+
+
+StationM <- Station %>% 
+  gather(station_N, prec, -day, -month, -year)
+
+
+Joint_CS <- left_join(StationM, test) %>% 
+  dplyr::select(-day, -month, -year, -layer) %>% 
+  nest(-station_N, -Lon , -Lat)
+
+  
+Joint_CS %>% 
+  dplyr::select(data) %>% 
+  filter(row_number() == 1) %>% 
+  unnest  %>% 
+  slice(n()) 
+
+
+
+library(broom)
+
+
+
+idea_models <- Joint_CS %>% 
+  unnest %>% 
+  group_by(station_N) %>% 
+  na.omit() %>% 
+  do(fitHour = lm(prec ~ Chirps, data = .)) 
+
+
+# Coeficients 
+tidy_models <- idea_models %>% 
+  tidy(fitHour)
+
+
+augment(idea_models, fitHour)
+
+# get the summary statistics by group in a tidy data_frame
+glance(idea_models, fitHour)
+
+
+
+View(tidy_models)
