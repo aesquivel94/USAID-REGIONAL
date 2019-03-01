@@ -122,7 +122,7 @@ id_year_prec <- Prec_table %>%
 # i=2.
 
 
-month_min <- 9;  tolerance <- 0.9
+month_min <- 8;  tolerance <-  0.2
 
 # =-=-=-=-=-=-=-=-=-=-=-= Function ---- next_minimum. 
 #  This function compute a Min local min. 
@@ -459,16 +459,34 @@ tictoc::toc() # 24.7
 
 
 
-# Percent NA by year.  
+
+# Save MSD data Grilled. 
+MSD_data %>% 
+  dplyr::select(year, MSD) %>% 
+  unnest %>% 
+  write_csv('MSD_Index/MSD_G.csv')
+
+
+# Save MSD data Grilled. 
+MSD_data %>% 
+  dplyr::select(year, id,  data) %>% 
+  unnest %>% 
+  write_csv('MSD_Index/Data_G.csv')
+
+
+
+
+
+# Percent NA by year.
 MSD_data %>%
   dplyr::select(-data, -id) %>%
   unnest %>%
-  group_by(year) %>% 
-  summarise_at(vars(Min:Magnitude), .funs = function(x){round(sum(x == -999)/150, 2)}) %>% 
-  ggplot(aes(x =  year, y =  Min)) + 
-  geom_bar(stat = 'identity', fill = 'red') + 
-  geom_hline(yintercept = 0.3) + 
-  theme_bw() + 
+  group_by(year) %>%
+  summarise_at(vars(Min:Magnitude), .funs = function(x){round(sum(x == -999)/150, 2)}) %>%
+  ggplot(aes(x =  year, y =  Min)) +
+  geom_bar(stat = 'identity', fill = 'red') +
+  geom_hline(yintercept = 0.3) +
+  theme_bw() +
   labs(x = NULL, y = '% NA')
 
 
@@ -698,7 +716,7 @@ Catalog_M <- Catalog %>%
 # Catalog_M$Lon
 
 
-Station_Chirps <- raster::extract(HND, Catalog_M[ ,2:3]) %>% 
+Station_Chirps <- raster::extract(HND, Catalog_M %>% dplyr::select(Lon, Lat)) %>% 
   as_tibble() %>% 
   bind_cols(Catalog_M, .) %>% 
   gather(layer, Chirps, -station_N, -Lon, -Lat ) %>%
@@ -718,7 +736,7 @@ return(data_dates)}
 
 
 # =-=-
-test <- Station_Chirps %>% 
+Station_Chirps <- Station_Chirps %>% 
   mutate(Data_dates = purrr::map(.x = data, .f = do_dates)) %>%
   dplyr::select(-data) %>%
   unnest() 
@@ -728,8 +746,8 @@ StationM <- Station %>%
   gather(station_N, prec, -day, -month, -year)
 
 
-Joint_CS <- left_join(StationM, test) %>% 
-  dplyr::select(-day, -month, -year, -layer) %>% 
+Joint_CS <- left_join(StationM, Station_Chirps) %>% 
+  dplyr::select(-layer) %>% 
   nest(-station_N, -Lon , -Lat)
 
   
@@ -739,17 +757,15 @@ Joint_CS %>%
   unnest  %>% 
   slice(n()) 
 
-
-
+# =-=-=-=-= Filling data...
 library(broom)
-
-
 
 idea_models <- Joint_CS %>% 
   unnest %>% 
   group_by(station_N) %>% 
   na.omit() %>% 
-  do(fitHour = lm(prec ~ Chirps, data = .)) 
+  do(fitHour = lm(prec ~ Chirps, data = .)) %>% 
+  mutate(coef = tidy(fitHour))
 
 
 # Coeficients 
@@ -757,11 +773,53 @@ tidy_models <- idea_models %>%
   tidy(fitHour)
 
 
-augment(idea_models, fitHour)
-
+#  fitted values and residuals 
+# augment(idea_models, fitHour)
 # get the summary statistics by group in a tidy data_frame
-glance(idea_models, fitHour)
+# glance(idea_models, fitHour)
+
+coef <- tidy_models %>% 
+  dplyr::select(station_N, term, estimate) %>% 
+  nest(-station_N) %>% 
+  rename(coef = 'data')
 
 
 
-View(tidy_models)
+filling_data <- function(data, coefficient){
+  # row_1 <- Joint_CS %>% right_join(., coef) %>% filter(row_number() == 2)
+  # data <-  dplyr::select(row_1, data) %>% unnest
+  # coefficient <- dplyr::select(row_1, coef) %>% unnest
+
+  coefficient <- coefficient %>% 
+    spread(key = term, value = estimate)  %>% 
+    set_names('a', 'b')
+  
+  a <- coefficient %>% 
+    dplyr::select(a) %>% 
+    as.numeric()
+  
+  b <- coefficient %>% 
+    dplyr::select(b) %>% 
+    as.numeric()
+
+    
+  Fill_data <- data %>% 
+    mutate(prec_R =  if_else(is.na(prec), a +  (b * Chirps), prec), 
+           prec_C = if_else(is.na(prec), Chirps, prec)) 
+    
+return(Fill_data)}
+
+
+
+new_JointCS <- Joint_CS %>%
+  right_join(., coef) %>% 
+  mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
+  dplyr::select(-data, -coef)
+
+
+new_JointCS %>% 
+  unnest 
+
+
+
+
