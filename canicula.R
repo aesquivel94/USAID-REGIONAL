@@ -460,6 +460,7 @@ tictoc::toc() # 24.7
 
 
 
+
 # Save MSD data Grilled. 
 MSD_data %>% 
   dplyr::select(year, MSD) %>% 
@@ -476,6 +477,7 @@ MSD_data %>%
 
 
 
+# MSD_data <- read_csv('MSD_Index/MSD_G.csv')
 
 # Percent NA by year.
 MSD_data %>%
@@ -724,12 +726,19 @@ Station_Chirps <- raster::extract(HND, Catalog_M %>% dplyr::select(Lon, Lat)) %>
   nest(-station_N)
 
 
+
+
+# MSD_data <- read_csv('MSD_Index/MSD_G.csv')
+
+
+
 # Function for do dates...
 do_dates <- function(Chirps_S){
-  # Chirps_S <- test %>% filter(station_N == 'SMN.HOND020_Galeras')
+  # Chirps_S <- Station_Chirps %>% filter(station_N == 'SMN.HOND020_Galeras') %>% unnest
   
   data_dates <- Chirps_S %>%
-    mutate(date = Prec_table$date,  julian = yday(date), 
+    mutate(date = seq( make_date(1982,1,1) , make_date(1982,1,1) + (nrow(.)-1), by = 'day'), 
+           julian = yday(date), 
            year = year(date), month = month(date))
   
 return(data_dates)}
@@ -742,13 +751,35 @@ Station_Chirps <- Station_Chirps %>%
   unnest() 
 
 
+
 StationM <- Station %>% 
-  gather(station_N, prec, -day, -month, -year)
+  mutate(date = seq( make_date(1982,1,1) , make_date(2017,12,31), by = 'day')) %>% 
+  gather(station_N, prec, -day, -month, -year, -date)
 
 
-Joint_CS <- left_join(StationM, Station_Chirps) %>% 
-  dplyr::select(-layer) %>% 
-  nest(-station_N, -Lon , -Lat)
+
+# =-=-=-=-=- corregir esta parte
+
+
+nrow( Station_Chirps %>% filter(year < 2018)) == nrow(StationM)
+
+nrow(cbind(StationM, Station_Chirps %>%  filter(year < 2018))) == nrow(StationM)
+
+
+# Joint_CS <- 
+  
+  
+
+  
+    
+    
+  
+  right_join(StationM, Station_Chirps %>%  filter(year < 2018)) # %>% 
+  # dplyr::select(-layer) %>% 
+  # nest(-station_N, -Lon , -Lat)
+
+
+
 
   
 Joint_CS %>% 
@@ -757,6 +788,16 @@ Joint_CS %>%
   unnest  %>% 
   slice(n()) 
 
+
+
+
+# Joint_CS %>%
+#   filter(row_number() == 1) %>%
+#   unnest %>%
+#   dplyr::select(date) %>%
+#   unique()
+
+
 # =-=-=-=-= Filling data...
 library(broom)
 
@@ -764,8 +805,7 @@ idea_models <- Joint_CS %>%
   unnest %>% 
   group_by(station_N) %>% 
   na.omit() %>% 
-  do(fitHour = lm(prec ~ Chirps, data = .)) %>% 
-  mutate(coef = tidy(fitHour))
+  do(fitHour = lm(prec ~ Chirps, data = .)) 
 
 
 # Coeficients 
@@ -814,12 +854,42 @@ return(Fill_data)}
 new_JointCS <- Joint_CS %>%
   right_join(., coef) %>% 
   mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
-  dplyr::select(-data, -coef)
+  dplyr::select(-data, -coef) %>% 
+  mutate(data = purrr::map(.x = data_filling, .f = function(.x){ data <- .x %>% 
+    # mutate(mov = movavg(x = prec_R, n = 31, type = 't')) }))
+    mutate(mov = movavg(x = prec_C, n = 31, type = 't')) }))
 
 
-new_JointCS %>% 
-  unnest 
 
+
+
+
+
+test <- new_JointCS %>% 
+  rename(x = 'Lon', y = 'Lat', id = 'station_N') %>% 
+  dplyr::select(-data_filling) %>% 
+  unnest %>% 
+  dplyr::select(year, id, date, julian, month, x, y,  prec_R, mov) %>% 
+  nest(-year, -id)
+
+
+
+
+ 
+row_test <- test %>% 
+  filter(row_number() == 10) 
+  
+  
+row_test %>% 
+  dplyr::select(data) %>% 
+  unnest %>% dplyr::select(julian) %>% 
+  unique %>%
+  slice(n())
+  
+  
+  
+  # mutate(test = purrr::map2(.x = id, .y = data, .f = MSD_id_Year))
+  # MSD_id_Year(id = id , pixel_yearT = data)
 
 
 
