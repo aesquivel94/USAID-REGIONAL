@@ -516,11 +516,11 @@ dry_C <- read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Hond
 
 
 p_data  <- MSD_data %>%
-  dplyr::select(-data, -id)  %>% 
-  unnest %>% 
+  # dplyr::select(-data, -id)  %>% 
+  # unnest %>% 
   na_if(-999) %>% 
   dplyr::select(year,  x, y, Intensity) %>% 
-  filter(between(year, 2015, 2018)) %>% 
+  # filter(between(year, 2015, 2018)) %>% 
   mutate(year = as.integer(year)) 
 
 p_data %>% dplyr::select(year) %>% unique
@@ -538,7 +538,9 @@ anim <-  ggplot(p_data) +
   # ease_aes('linear')
 
 
-animate(anim, renderer = ffmpeg_renderer())
+# animate(anim, renderer = ffmpeg_renderer())
+
+anim_save("filenamehere.gif", anim)
 
 
 # MSD_data %>%
@@ -885,4 +887,48 @@ test <- new_JointCS %>%
 
 proof <- test %>% 
   mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year))
+
+
+
+
+
+proof %>% 
+  dplyr::select(-data) %>% 
+  unnest %>% 
+  dplyr::select(id, Intensity, Length, Magnitude) %>% 
+  group_by(id) %>% 
+  skim()
+
+
+
+
+
+
+graph <- proof %>% 
+  filter(year == 2017) %>% 
+  dplyr::select(-data) %>%
+  unnest %>% 
+  na_if(-999) 
+
+
+ 
+  ggplot(graph , aes(x, y, fill = Magnitude)) +
+  geom_tile() +  
+  scale_fill_viridis() + 
+  # geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  # geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = NULL, y = NULL) # + 
+  # geom_point(data = Honduras_art, aes(x, y))
+
+
+# Hacer un comparativo en esos puntos por lo menos para la estación 
+# tratar de terminarlo de aquí a mañana. 
+  
+# Hacer la serie de llenado de datos para estaciones
+# Intentar hacer el llenado de datos (modelo-por año)...
+
+
+
+
 
