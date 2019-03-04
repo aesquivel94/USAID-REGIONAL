@@ -759,25 +759,17 @@ StationM <- Station %>%
 
 
 # =-=-=-=-=- corregir esta parte
+# nrow( Station_Chirps %>% filter(year < 2018)) == nrow(StationM)
+Joint_CS <-  inner_join(StationM, Station_Chirps %>%  filter(year < 2018)) %>% 
+  dplyr::select(-layer) %>% 
+  nest(-station_N, -Lon , -Lat)
 
 
-nrow( Station_Chirps %>% filter(year < 2018)) == nrow(StationM)
 
-nrow(cbind(StationM, Station_Chirps %>%  filter(year < 2018))) == nrow(StationM)
-
-
-# Joint_CS <- 
-  
-  
-
-  
-    
-    
-  
-  right_join(StationM, Station_Chirps %>%  filter(year < 2018)) # %>% 
-  # dplyr::select(-layer) %>% 
-  # nest(-station_N, -Lon , -Lat)
-
+# No idea but, i want to save this... 
+year_Join_CS <- Joint_CS %>% 
+  unnest %>% 
+  nest(-station_N, -Lon,   -Lat, -year)
 
 
 
@@ -788,14 +780,6 @@ Joint_CS %>%
   unnest  %>% 
   slice(n()) 
 
-
-
-
-# Joint_CS %>%
-#   filter(row_number() == 1) %>%
-#   unnest %>%
-#   dplyr::select(date) %>%
-#   unique()
 
 
 # =-=-=-=-= Filling data...
@@ -850,7 +834,7 @@ filling_data <- function(data, coefficient){
 return(Fill_data)}
 
 
-
+# Fix this part
 new_JointCS <- Joint_CS %>%
   right_join(., coef) %>% 
   mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
@@ -861,35 +845,44 @@ new_JointCS <- Joint_CS %>%
 
 
 
+# new_JointCS %>% 
+#   dplyr::select(station_N, Lon,Lat,  data) %>% 
+#   unnest %>% 
+#   write_csv('MSD_Index/DataS_O.csv')
+  
 
-
-
+# =-=-=-=-=-=-=-=-
 
 test <- new_JointCS %>% 
   rename(x = 'Lon', y = 'Lat', id = 'station_N') %>% 
   dplyr::select(-data_filling) %>% 
   unnest %>% 
-  dplyr::select(year, id, date, julian, month, x, y,  prec_R, mov) %>% 
+  mutate(prec = prec_C) %>% # new row
+  dplyr::select(year, id, date, julian, month, x, y,  prec, mov) %>% 
   nest(-year, -id)
 
-
-
-
  
-row_test <- test %>% 
-  filter(row_number() == 10) 
-  
-  
-row_test %>% 
-  dplyr::select(data) %>% 
-  unnest %>% dplyr::select(julian) %>% 
-  unique %>%
-  slice(n())
-  
-  
-  
-  # mutate(test = purrr::map2(.x = id, .y = data, .f = MSD_id_Year))
-  # MSD_id_Year(id = id , pixel_yearT = data)
+# row_test <- test %>% 
+#   filter(row_number() == 300) 
+#   
+#   
+# row_test %>% 
+#   dplyr::select(data) %>% 
+#   unnest %>% dplyr::select(julian) %>% 
+#   unique %>%
+#   slice(n())
+#   
+#   # mutate(test = purrr::map2(.x = id, .y = data, .f = MSD_id_Year))
+#   # MSD_id_Year(id = id , pixel_yearT = data)
+# 
+# id <- row_test$id
+# pixel_yearT <-row_test %>% dplyr::select(data) %>% unnest
+# 
+# MSD_id_Year(id = id, pixel_yearT = pixel_yearT)
 
 
+
+
+proof <- test %>% 
+  mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year))
 
