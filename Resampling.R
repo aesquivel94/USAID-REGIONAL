@@ -40,20 +40,7 @@ resampling <-  function(data, CPT_prob){
     dplyr::select(Season) %>% 
     unique
 
-    
-  month.abb
-  str_sub(month.abb, 1, 1)
 
-  
-  # x <- paste0(str_sub(month.abb, 1, 1), lead(str_sub(month.abb, 1, 1)),
-  #                     lead(lead(str_sub(month.abb, 1, 1), n = 1))) 
-  
-  x <- case_when(x == 'NDNA' ~ 'NDJ', 
-            x == 'DNANA' ~ 'DJF', 
-            TRUE ~ as.character(x))
-  
-  
-  
   season_to_months <-  function(season){
    
     season <- CPT_prob %>% 
@@ -71,31 +58,59 @@ resampling <-  function(data, CPT_prob){
   
   
   
-  all_seasons %>% 
-    filter(x %in%  season)
-  
-    
-  }
+  all_seasons <- all_seasons %>% 
+    filter(str_detect(x, as.character(season[1,])) | 
+           str_detect(x, as.character(season[2,]) ) ) 
   
   
+  return(all_seasons)}
   
-  CPT_prob %>% 
-    # nest(-Season) %>% 
-    # mutate(data_filter = )
   
+
+  Times <- season_to_months(Times)
   
   
   
+  xi <- Times[1,]
   
-  # data   
+  proof <- data %>% 
+    filter(between(month, xi$start_month, xi$end_month)) %>% 
+    group_by(year) %>% 
+    summarise(precip = sum(precip)) %>% 
+    arrange(desc(precip)) 
   
   
+  Prob <- CPT_prob %>% 
+    filter(Season == xi$x)
   
- # do_one_season <- function(season, prob, data){}
+   
+   Type_cat <- tibble( id = 1:100) %>% 
+     mutate(sample_cat = purrr::map(.x = id, .f = function(.x){
+       sample_n(Prob,  size = 1, weight = Prob) }))
+   
+   
+   
+   Type_cat %>% 
+     filter(row_number() == 1) %>% 
+     unnest
+   
+  # =-=-=-=-=-=-=-=-=-=-= 
+   
+   quantile <- quantile(proof$precip, probs = c(0.33, 0.66))
+   
   
-  
-  
-  
+   proof %>% 
+     mutate(condtion = case_when(
+       precip < quantile[1] ~  'Below',
+       precip > quantile[2] ~ 'Above' ,
+       TRUE ~ 'Normal'
+     )  ) %>% 
+     nest(-condtion)
+   
+  # =-=-=-=-=-=-=-=-=-=-= 
+   
+   
+     
 }
 
 
