@@ -138,8 +138,7 @@ resampling <-  function(data, CPT_prob){
 return(new_data)}
   
   
-  
-  
+
   Times <- Times %>% 
     rename(xi = 'data') %>% 
     mutate(month_data = purrr::map2(.x = Season, .y = xi, 
@@ -180,8 +179,9 @@ return(new_data)}
       
       year_sample <- base_cat %>% 
         mutate(sample =  purrr::map(.x = sample_cat, .f = by_cat, mothly_data = mothly_data)) %>% 
-        dplyr::select(-sample_cat) %>% 
-        unnest
+        # dplyr::select(-sample_cat) %>%
+        unnest %>% 
+        dplyr::select( -Type, -Prob)
       
     return(year_sample)}
     
@@ -190,11 +190,86 @@ return(new_data)}
       mutate(cat = purrr::map2(.x = cat, .y = month_data, .f = year_function))
     
 
+
     
     
-
-
-}
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
+    day_sample <- function(Season, cat, data){
+      # data it's station data.  
+      # cat <-  Times %>%  dplyr::select(cat) %>% filter(row_number() < 2) %>% unnest
+      # Season <- 'NDJ'
+      
+      
+      month_ini <- cat %>% 
+        dplyr::select(start_month) %>% 
+        unique() %>% 
+        as.numeric()
+      
+      month_end <- cat %>% 
+        dplyr::select(end_month) %>% 
+        unique() %>% 
+        as.numeric()
+      
+      # Filter by season data serie.
+      if(Season == 'NDJ'){
+        Daily_filter <- data %>%
+          filter(month %in% c(11,12,1)) %>% 
+          mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
+          filter(year_M >= 1981) %>%
+          mutate(year = year_M - 1) %>% 
+          dplyr::select(-year_M)
+        
+      } else if(Season == 'DJF'){
+        Daily_filter <- data %>%
+          filter(month %in% c(11,12,1)) %>% 
+          mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
+          filter(year_M >= 1981) %>%
+          mutate(year = year_M - 1) %>% 
+          dplyr::select(-year_M)
+        
+      } else{
+        Daily_filter <-  data %>%
+          filter(between(month, month_ini, month_end)) 
+      }
+      
+      
+      Daily_data <- cat %>% 
+        dplyr::select(-start_month, -end_month) %>% 
+        mutate(daily_data = purrr::map(.x = year, .f = function(.x){
+          Daily_filter %>% filter(year == .x)})) %>% 
+        dplyr::select(-year)
+      
+    }
+    
+    daily_data <- Times %>% 
+      mutate(daily_data = purrr::map2(.x = Season, .y = cat, .f = day_sample, data = data)) %>% 
+      dplyr::select(Season, daily_data)
+    
+    
+    
+    # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
+    
+    daily_data %>% 
+      unnest %>% 
+      dplyr::select(-condtion) %>% 
+      nest(-id) %>% 
+      filter(row_number() < 2) %>%
+      dplyr::select(-id)%>% 
+      unnest %>% 
+      unnest() %>% 
+      dplyr::select(-Season) %>% 
+      View
+    
+    
+    
+    
+  Escenaries <- daily_data %>% 
+      unnest %>% 
+      dplyr::select(-condtion) %>% 
+      nest(-id) %>% 
+      mutate(data = purrr::map(.x = data, .f = function(.x){ .x %>%  unnest %>%   unnest() %>%  dplyr::select(-Season) })) 
+    
+return(Escenaries)}
 
 
 
