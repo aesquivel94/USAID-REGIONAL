@@ -23,9 +23,13 @@ library(skimr)
 Cerete <- readr::read_csv("Resampling/daily_preliminar/Cerete.csv")
 Prob <- readr::read_csv("Resampling/CPT_prob/Cerete1_prob_precip.csv")
 
+# year ...  necesito que identifique el sistema si el año es bisiesto. 
+year_forecast <- Sys.Date() %>% year()
 
-resampling <-  function(data, CPT_prob){
+
+resampling <-  function(data, CPT_prob, year_forecast){
  
+  
   data <- Cerete # Datos de estaciones a nivel diario. 
   
   # Datos de probabilidad cambiando a  Type - Season -  Prob
@@ -36,6 +40,140 @@ resampling <-  function(data, CPT_prob){
     gather(Season, Prob, -Type)
   
   
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  # Tratando de arreglar febrero...
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  
+  # year_forecast <- 2016
+  # Is a year a leap year?
+  leap_year(year_forecast)
+ 
+  # add <- data %>% 
+  #   filter(month == 2) %>% 
+  #   sample_n(size = 1) %>% 
+  #   mutate(day = 29)
+ 
+  
+  # data %>% 
+  #   add_row(.after = 59) %>% 
+  #   View
+ 
+  
+  # February <- data %>% 
+  #   filter(month == 2) %>% 
+  #   mutate(condition = leap_year(year)) %>%
+  #   nest(-condition, -year) %>% 
+  #   mutate(length = purrr::map(.x = data, .f = function(.x){nrow(.x)})) %>% 
+  #   unnest(length)
+  
+ 
+# Si ... length == 28 # Días incompletos.
+  complete_month <- function(data_incomplete){
+    # data_incomplete <- filter(February, row_number() == 2 ) %>% dplyr::select(data) %>% unnest
+    data_incomplete <- bind_rows(data_incomplete, data_incomplete %>% sample_n(size = 1) %>% mutate(day = 29)) 
+  return(data_incomplete)}
+  
+# Si ... length == 29 # Días completos
+  incomplete_month <- function(data_complete){
+    # data_complete <- filter(February, row_number() == 1 ) %>% dplyr::select(data) %>% unnest
+    data_complete <- data_complete %>% slice(-n())
+  return(data_complete)}
+  
+# Se usa cuando leap == FALSE
+  intento_cordura <- function(to_change){
+    # to_change <-  testing_Data %>%  filter(leap ==  FALSE) %>% dplyr::select(-leap) 
+    
+    Dato_C <- to_change %>%  
+      nest(-year) %>% 
+      mutate(data = purrr::map(.x = data, .f = complete_month)) %>% 
+      unnest %>% 
+      dplyr::select(day, month,  year, precip,  tmax,  tmin,  srad)
+    return(Dato_C)}
+  
+# Se usa cuando leap == TRUE  
+  estoy_loca <- function(to_change){
+    # to_change <-  testing_Data %>%  filter(leap ==  TRUE) %>% dplyr::select(-leap) 
+    
+    Dato_C <- to_change %>% 
+      nest(-year) %>% 
+      mutate(data = purrr::map(.x = data, .f = incomplete_month)) %>% 
+      unnest %>% 
+      dplyr::select(day, month,  year, precip,  tmax,  tmin,  srad) 
+    return(Dato_C)}
+  
+  
+  
+  # 
+  
+  data_P <- data %>% 
+    mutate(month_P = month) %>% 
+    nest(-month_P)
+
+  
+  # data_P[2,2] <- add
+
+  
+  year_forecast <- 2016
+  
+  # Organizar desde esta parte
+  change_Leap <- function(leap, feb_data){
+    # feb_data <- data_P %>% filter(month_P == 2) %>% dplyr::select(data) %>% unnest
+    
+    testing_Data <- feb_data %>% 
+      mutate(leap = leap_year(year)) %>% 
+      nest(-leap)
+  
+    if (leap == TRUE) {
+      
+      testing_Data <- testing_Data %>% 
+        mutate(data = purrr::map_if(.x = data, .p = leap ==  TRUE, .f = estoy_loca))
+      
+    } else {
+      
+      testing_Data <- testing_Data %>% 
+        mutate(data = purrr::map_if(.x = data, .p = leap ==  FALSE, .f = intento_cordura))
+
+    }
+  return(testing_Data) }
+  
+ 
+  
+
+  
+  
+
+  
+  
+  
+  
+
+  
+  
+  
+  
+  
+  
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
+  
+  
+  
+  
+  # =-=-=-=-=  Do years 
+  
+  Intial_year <- data %>% 
+    dplyr::select(year) %>% 
+    unique %>% 
+    slice(1) %>% 
+    as.numeric()
+  
+  
+  last_year <- data %>% 
+    dplyr::select(year) %>% 
+    unique %>% 
+    slice(n()) %>% 
+    as.numeric()
+  
+  
 
   # =-=-=-=-=-=-=-=-=-=-=-=-=
   season_to_months <-  function(season){
@@ -44,7 +182,6 @@ resampling <-  function(data, CPT_prob){
     #   nest(-Season) %>% 
     #   dplyr::select(Season) %>% 
     #   filter(row_number() == 1)
-    
     
   all_seasons <-  paste0(str_sub(month.abb, 1, 1), lead(str_sub(month.abb, 1, 1)),
                 lead(lead(str_sub(month.abb, 1, 1), n = 1))) %>% 
@@ -71,10 +208,10 @@ resampling <-  function(data, CPT_prob){
   Times <- CPT_prob %>% 
     nest(-Season) %>% 
     mutate(Times = purrr::map(.x = Season, .f = season_to_months)) %>% 
-    # dplyr::select(Season, Times) %>% 
     unnest(Times) %>% 
     unnest() %>% 
     nest(-Season)
+  
   
   # =-=-=-=-=-=-=-=-=-=-=-=-=
   do_organize_data <- function(Season, xi, data){
@@ -97,7 +234,7 @@ resampling <-  function(data, CPT_prob){
    new_data <- data %>%
       filter(month %in% c(11,12,1)) %>% 
       mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
-      filter(year_M >= 1981) %>%
+      filter(year_M >= (Intial_year + 1), year_M < (last_year +1 ))%>%
       group_by(year_M) %>% 
       summarise(precip = sum(precip)) %>% 
       mutate(year = year_M - 1) %>% 
@@ -107,7 +244,7 @@ resampling <-  function(data, CPT_prob){
     new_data <- data %>%
       filter(month %in% c(11,12,1)) %>% 
       mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
-      filter(year_M >= 1981) %>%
+      filter(year_M >= (Intial_year + 1), year_M < (last_year +1 ))  %>%
       group_by(year_M) %>% 
       summarise(precip = sum(precip)) %>% 
       mutate(year = year_M - 1) %>% 
@@ -215,7 +352,7 @@ return(new_data)}
         Daily_filter <- data %>%
           filter(month %in% c(11,12,1)) %>% 
           mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
-          filter(year_M >= 1981) %>%
+          filter(year_M >= (Intial_year + 1), year_M < (last_year + 1))%>%
           mutate(year = year_M - 1) %>% 
           dplyr::select(-year_M)
         
@@ -223,7 +360,7 @@ return(new_data)}
         Daily_filter <- data %>%
           filter(month %in% c(11,12,1)) %>% 
           mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
-          filter(year_M >= 1981) %>%
+          filter(year_M >= (Intial_year + 1), year_M < (last_year +1 ))%>%
           mutate(year = year_M - 1) %>% 
           dplyr::select(-year_M)
         
@@ -249,19 +386,17 @@ return(new_data)}
     
     # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
     
-    daily_data %>% 
-      unnest %>% 
-      dplyr::select(-condtion) %>% 
-      nest(-id) %>% 
-      filter(row_number() < 2) %>%
-      dplyr::select(-id)%>% 
-      unnest %>% 
-      unnest() %>% 
-      dplyr::select(-Season) %>% 
-      View
-    
-    
-    
+    # daily_data %>% 
+    #   unnest %>% 
+    #   dplyr::select(-condtion) %>% 
+    #   nest(-id) %>% 
+    #   filter(row_number() < 2) %>%
+    #   dplyr::select(-id)%>% 
+    #   unnest %>% 
+    #   unnest() %>% 
+    #   dplyr::select(-Season) %>% 
+    #   View
+
     
   Escenaries <- daily_data %>% 
       unnest %>% 
@@ -269,6 +404,16 @@ return(new_data)}
       nest(-id) %>% 
       mutate(data = purrr::map(.x = data, .f = function(.x){ .x %>%  unnest %>%   unnest() %>%  dplyr::select(-Season) })) 
     
+  
+  
+  
+  # Escenaries %>% 
+  #   mutate(try = purrr::map(.x = data, .f = function(.x){nrow(.x)} )) %>% 
+  #   dplyr::select(-data) %>% 
+  #   unnest %>% 
+  #   View
+  
+  
 return(Escenaries)}
 
 
