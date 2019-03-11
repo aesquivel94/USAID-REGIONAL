@@ -45,16 +45,16 @@ resampling <-  function(data, CPT_prob, year_forecast){
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   
   # If ... length == 28 # incomplete days in other words add row. 
-  complete_month <- function(data_incomplete){
-    # data_incomplete <- filter(February, row_number() == 2 ) %>% dplyr::select(data) %>% unnest
-    data_incomplete <- bind_rows(data_incomplete, data_incomplete %>% sample_n(size = 1) %>% mutate(day = 29)) 
-  return(data_incomplete)}
+  # complete_month <- function(data_incomplete){
+  #   # data_incomplete <- filter(February, row_number() == 2 ) %>% dplyr::select(data) %>% unnest
+  #   data_incomplete <- bind_rows(data_incomplete, data_incomplete %>% sample_n(size = 1) %>% mutate(day = 29)) 
+  # return(data_incomplete)}
   
   # If ... length == 29 # complete days in other words delete a row. 
-  incomplete_month <- function(data_complete){
-    # data_complete <- filter(February, row_number() == 1 ) %>% dplyr::select(data) %>% unnest
-    data_complete <- data_complete %>% slice(-n())
-  return(data_complete)}
+  # incomplete_month <- function(data_complete){
+  #   # data_complete <- filter(February, row_number() == 1 ) %>% dplyr::select(data) %>% unnest
+  #   data_complete <- data_complete %>% slice(-n())
+  # return(data_complete)}
   
   # It's use when leap == FALSE (this function add a row in each february with 28 days). 
   add_29_day <- function(to_change){
@@ -62,7 +62,9 @@ resampling <-  function(data, CPT_prob, year_forecast){
     
     Dato_C <- to_change %>%  
       nest(-year) %>% 
-      mutate(data = purrr::map(.x = data, .f = complete_month)) %>% 
+      mutate(data = purrr::map(.x = data, .f = function(.x){
+        data_add <- bind_rows(.x, .x %>% sample_n(size = 1) %>% mutate(day = 29)) 
+      return(data_add)})) %>% 
       unnest %>% 
       dplyr::select(day, month,  year, precip,  tmax,  tmin,  srad)
     return(Dato_C)}
@@ -73,7 +75,9 @@ resampling <-  function(data, CPT_prob, year_forecast){
     
     Dato_C <- to_change %>% 
       nest(-year) %>% 
-      mutate(data = purrr::map(.x = data, .f = incomplete_month)) %>% 
+      mutate(data = purrr::map(.x = data, .f = function(.x){
+        data_less <- .x %>% slice(-n())
+      return(data_less)})) %>% 
       unnest %>% 
       dplyr::select(day, month,  year, precip,  tmax,  tmin,  srad) 
     return(Dato_C)}
@@ -84,8 +88,7 @@ resampling <-  function(data, CPT_prob, year_forecast){
   data_P <- data %>% 
     mutate(month_P = month) %>% 
     nest(-month_P)
-  
-  
+
   
   # This function organize the february data.
   change_Leap <- function(leap_forecast, feb_data){
@@ -97,23 +100,18 @@ resampling <-  function(data, CPT_prob, year_forecast){
       nest(-leap)
   
     if (leap_forecast == TRUE) { # if year_forecast == TRUE (all days need to have 29 days).
-      
       data_to_change <- data_to_change %>% 
         mutate(data = purrr::map_if(.x = data, .p = leap == FALSE , .f = add_29_day))
-      
     } else {
-      
       data_to_change <- data_to_change %>% 
         mutate(data = purrr::map_if(.x = data, .p = leap ==  TRUE, .f = less_29_day))
-
     }
     
     data_to_change <- data_to_change %>% 
       unnest %>% 
       dplyr::select(-leap) %>%  
       arrange(year) 
-    
-    
+  
   return(data_to_change) }
   
   
