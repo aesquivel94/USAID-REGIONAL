@@ -40,47 +40,24 @@ resampling <-  function(data, CPT_prob, year_forecast){
     gather(Season, Prob, -Type)
   
   
-  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  # Tratando de arreglar febrero...
-  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  # Fix february: depends if leap year it's true or false.
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   
-  # year_forecast <- 2016
-  # Is a year a leap year?
-  leap_year(year_forecast)
- 
-  # add <- data %>% 
-  #   filter(month == 2) %>% 
-  #   sample_n(size = 1) %>% 
-  #   mutate(day = 29)
- 
-  
-  # data %>% 
-  #   add_row(.after = 59) %>% 
-  #   View
- 
-  
-  # February <- data %>% 
-  #   filter(month == 2) %>% 
-  #   mutate(condition = leap_year(year)) %>%
-  #   nest(-condition, -year) %>% 
-  #   mutate(length = purrr::map(.x = data, .f = function(.x){nrow(.x)})) %>% 
-  #   unnest(length)
-  
- 
-# Si ... length == 28 # Días incompletos.
+  # If ... length == 28 # incomplete days in other words add row. 
   complete_month <- function(data_incomplete){
     # data_incomplete <- filter(February, row_number() == 2 ) %>% dplyr::select(data) %>% unnest
     data_incomplete <- bind_rows(data_incomplete, data_incomplete %>% sample_n(size = 1) %>% mutate(day = 29)) 
   return(data_incomplete)}
   
-# Si ... length == 29 # Días completos
+  # If ... length == 29 # complete days in other words delete a row. 
   incomplete_month <- function(data_complete){
     # data_complete <- filter(February, row_number() == 1 ) %>% dplyr::select(data) %>% unnest
     data_complete <- data_complete %>% slice(-n())
   return(data_complete)}
   
-# Se usa cuando leap == FALSE
-  intento_cordura <- function(to_change){
+  # It's use when leap == FALSE (this function add a row in each february with 28 days). 
+  add_29_day <- function(to_change){
     # to_change <-  testing_Data %>%  filter(leap ==  FALSE) %>% dplyr::select(-leap) 
     
     Dato_C <- to_change %>%  
@@ -90,8 +67,8 @@ resampling <-  function(data, CPT_prob, year_forecast){
       dplyr::select(day, month,  year, precip,  tmax,  tmin,  srad)
     return(Dato_C)}
   
-# Se usa cuando leap == TRUE  
-  estoy_loca <- function(to_change){
+  # It's use when leap == TRUE (this function delete a row in each february with 29 days). 
+  less_29_day <- function(to_change){
     # to_change <-  testing_Data %>%  filter(leap ==  TRUE) %>% dplyr::select(-leap) 
     
     Dato_C <- to_change %>% 
@@ -103,44 +80,47 @@ resampling <-  function(data, CPT_prob, year_forecast){
   
   
   
-  # 
-  
+  # Create a new data. 
   data_P <- data %>% 
     mutate(month_P = month) %>% 
     nest(-month_P)
-
   
-  # data_P[2,2] <- add
-
   
-  year_forecast <- 2016
   
-  # Organizar desde esta parte
-  change_Leap <- function(leap, feb_data){
+  # This function organize the february data.
+  change_Leap <- function(leap_forecast, feb_data){
     # feb_data <- data_P %>% filter(month_P == 2) %>% dplyr::select(data) %>% unnest
+    # leap_forecast <- FALSE
     
-    testing_Data <- feb_data %>% 
+    data_to_change <- feb_data %>% 
       mutate(leap = leap_year(year)) %>% 
       nest(-leap)
   
-    if (leap == TRUE) {
+    if (leap_forecast == TRUE) { # if year_forecast == TRUE (all days need to have 29 days).
       
-      testing_Data <- testing_Data %>% 
-        mutate(data = purrr::map_if(.x = data, .p = leap ==  TRUE, .f = estoy_loca))
+      data_to_change <- data_to_change %>% 
+        mutate(data = purrr::map_if(.x = data, .p = leap == FALSE , .f = add_29_day))
       
     } else {
       
-      testing_Data <- testing_Data %>% 
-        mutate(data = purrr::map_if(.x = data, .p = leap ==  FALSE, .f = intento_cordura))
+      data_to_change <- data_to_change %>% 
+        mutate(data = purrr::map_if(.x = data, .p = leap ==  TRUE, .f = less_29_day))
 
     }
-  return(testing_Data) }
+    
+    data_to_change <- data_to_change %>% 
+      unnest %>% 
+      dplyr::select(-leap) %>%  
+      arrange(year) 
+    
+    
+  return(data_to_change) }
   
- 
-  
-
   
   
+  data_P <- data_P %>% 
+    mutate(data = purrr::map_if(.x = data ,.p = month_P == 2 ,
+                                .f = change_Leap, leap_forecast = leap_year(year_forecast)))
 
   
   
