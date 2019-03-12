@@ -266,6 +266,7 @@ day_sample <- function(Season, cat, data, Intial_year, last_year){
  
 
 
+                                          
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
@@ -380,26 +381,123 @@ resampling <-  function(data, CPT_prob, year_forecast){
     unnest %>% 
     dplyr::select(-condtion) %>% 
     nest(-id) %>% 
-    mutate(data = purrr::map(.x = data, .f = function(.x){ .x %>%  unnest %>%   unnest() %>%  dplyr::select(-Season) })) 
+    mutate(data = purrr::map(.x = data, .f = function(.x){ .x %>%  unnest %>%   unnest() %>%  dplyr::select(-Season) })) %>% 
+    unnest %>% 
+    mutate(year = year_forecast) %>% 
+    nest(-id)
   
-
-  # Escenaries %>% 
-  #   mutate(try = purrr::map(.x = data, .f = function(.x){nrow(.x)} )) %>% 
-  #   dplyr::select(-data) %>% 
-  #   unnest %>% 
-  #   View
-
   return(Escenaries)}
 
 
 
 
-
+# We are testing only for one file... but the idea it's have the other files 
+# and put the results in a specific folder. 
 cerete <- resampling(data = Cerete, CPT_prob = CPT_prob, 
            year_forecast = year_forecast)
 
 
-cerete %>% 
-  unnest
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+# Read daily data: 
+Cerete <- readr::read_csv("Resampling/daily_preliminar/Cerete.csv")
+Prob <- readr::read_csv("Resampling/CPT_prob/Cerete1_prob_precip.csv")
+
+# year ...  necesito que identifique el sistema si el año es bisiesto. 
+year_forecast <- Sys.Date() %>% year()
+
+
+
+
+# Read daily data:
+Path_stations <- 'Resampling/daily_preliminar'
+Path_Prob <- 'Resampling/CPT_prob'
+
+# =-=-=-=-=-=-=-=-=
+Initial_data <- tibble(names = list.files(Path_stations) %>% str_remove('.csv'), 
+       path_stations = Path_stations %>% list.files(full.names = TRUE), 
+       CPT_path = Path_Prob %>% list.files(full.names = TRUE)) %>% 
+  mutate(stations = purrr::map(.x = path_stations, .f =  readr::read_csv),
+         CPT_prob = purrr::map(.x = CPT_path, .f =  readr::read_csv)) %>% 
+  dplyr::select(-path_stations, -CPT_path) 
+
+
+
+#  Transformar esta parte es posible que se necesite cambiarla... dependiendo de la reunion. 
+Initial_data <- Initial_data %>% 
+  mutate(CPT_prob = purrr::map(.x = CPT_prob, .f = function(.x){
+    Prov <- .x %>% .[,c(1, 4)] %>% set_names('NDJ', 'FMA') %>%
+      mutate(Type = c('Below', 'Normal', 'Above')) %>% gather(Season, Prob, -Type)
+  return(Prov)})) 
+
+
+# =-=-=-=-=-=-=-=
+
+tictoc::tic()
+Resam <- Initial_data %>% 
+  mutate(Escenaries = purrr::map2(.x = stations, .y = CPT_prob, 
+                                  .f = resampling, year_forecast = year_forecast))
+tictoc::toc() # less than one minute.
+
+
+# 
+path_out <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/results/'
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+function_to_save <- function(station, Escenaries, path_out){
+  
+  # data <- Resam %>%  filter(row_number() == 1) %>%  dplyr::select(names, Escenaries)
+  # station <- data %>% dplyr::select(names)
+  # Escenaries <- data %>% dplyr::select(Escenaries) %>% unnest
+  
+  Esc_C <- Escenaries %>% 
+    mutate(file_name = glue::glue('{path_out}{station}/escenario_{id}.csv')) 
+  
+  
+  ifelse(dir.exists(glue::glue('{path_out}{station}')) == FALSE, 
+         dir.create(glue::glue('{path_out}{station}')), 'ok')
+  
+  
+
+  walk2(.x = Esc_C$data, .y = Esc_C$file_name, 
+                      .f = function(.x, .y){ write_csv(x = .x, path = .y)})
+  
+  
+  summaries <- Esc_C %>% 
+    dplyr::select(data) %>% 
+    unnest %>% 
+    group_by(month, year) %>% 
+    summarise(prec_avg = mean(precip), prec_max = max(precip), prec_min = min(precip),
+              sol_rad_avg = mean(srad), sol_rad_max = max(srad), sol_rad_min = min(srad), 
+              t_max_avg = mean(tmax), t_max_max = max(tmax), t_max_min = min(tmax), 
+              t_min_avg = mean(tmin), t_min_max = max(tmin), t_min_min = min(tmin)) %>% 
+    gather(variable, value, -month, -year) %>% 
+    ungroup() %>% 
+    nest(-variable) %>% 
+    mutate(file_name = glue::glue('{path_out}{station}/{variable}.csv'))
+  
+  
+  walk2(.x = summaries$data, .y = summaries$file_name, 
+        .f = function(.x, .y){write_csv(x = .x, path = .y)})
+  
+}
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
+purrr::map2(.x = Resam$names, .y = Resam$Escenaries, 
+            .f = function_to_save, path_out = path_out)
+
+
+
+
+
+
+
 
 
