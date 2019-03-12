@@ -113,7 +113,7 @@ season_to_months <-  function(season){
   return(all_seasons)}
 
 # .2.This function organize and classify monthly data by category for one season.
-do_organize_data <- function(Season, xi, data){
+do_organize_data <- function(Season, xi, data, Intial_year, last_year){
   
   # xi <- Times %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
   # Season <- 'NDJ'
@@ -215,7 +215,7 @@ year_function <- function(base_cat, mothly_data){
 # 3. Daily data
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
 # This function extract daily data using sample year. 
-day_sample <- function(Season, cat, data){
+day_sample <- function(Season, cat, data, Intial_year, last_year){
   # data it's station data.  
   # cat <-  Times %>%  dplyr::select(cat) %>% filter(row_number() < 2) %>% unnest
   # Season <- 'NDJ'
@@ -320,8 +320,6 @@ resampling <-  function(data, CPT_prob, year_forecast){
     unnest %>% 
     arrange(year)
   
-  
-  
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
   # =-=-=-=-=  Do years (start year and end year)...
   
@@ -330,15 +328,14 @@ resampling <-  function(data, CPT_prob, year_forecast){
     unique %>% 
     slice(1) %>% 
     as.numeric()
-  
-  
+
   last_year <- data %>% 
     dplyr::select(year) %>% 
     unique %>% 
     slice(n()) %>% 
     as.numeric()
   
-  
+
   
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   # 2. Organize Probability, monthly data and daily data. 
@@ -351,13 +348,14 @@ resampling <-  function(data, CPT_prob, year_forecast){
     unnest(Times) %>% 
     unnest() %>% 
     nest(-Season)
-  
+
   
   # In this part we create a new variable with monthly data classify.
   Times <- Times %>% 
     rename(xi = 'data') %>% 
     mutate(month_data = purrr::map2(.x = Season, .y = xi, 
-                                    .f = do_organize_data, data = data))
+                                    .f = do_organize_data, data = data, 
+                                    Intial_year = Intial_year, last_year = last_year))
   
   # This function do the 100 category samples.   
   Times <- Times %>%
@@ -370,9 +368,11 @@ resampling <-  function(data, CPT_prob, year_forecast){
   
   # This function extract daily data using sample year.  
   daily_data <- Times %>% 
-    mutate(daily_data = purrr::map2(.x = Season, .y = cat, .f = day_sample, data = data)) %>% 
+    mutate(daily_data = purrr::map2(.x = Season, .y = cat, .f = day_sample, 
+                                    data = data, Intial_year = Intial_year, 
+                                    last_year = last_year)) %>% 
     dplyr::select(Season, daily_data)
-  
+
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
   
   
@@ -382,24 +382,24 @@ resampling <-  function(data, CPT_prob, year_forecast){
     nest(-id) %>% 
     mutate(data = purrr::map(.x = data, .f = function(.x){ .x %>%  unnest %>%   unnest() %>%  dplyr::select(-Season) })) 
   
-  
+
   # Escenaries %>% 
   #   mutate(try = purrr::map(.x = data, .f = function(.x){nrow(.x)} )) %>% 
   #   dplyr::select(-data) %>% 
   #   unnest %>% 
   #   View
-  
-  
+
   return(Escenaries)}
 
 
 
 
 
-resampling(data = Cerete, CPT_prob = CPT_prob, 
+cerete <- resampling(data = Cerete, CPT_prob = CPT_prob, 
            year_forecast = year_forecast)
 
 
-
+cerete %>% 
+  unnest
 
 
