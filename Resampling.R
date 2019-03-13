@@ -14,7 +14,6 @@ library(tictoc)
 library(glue)
 library(lubridate)
 library(cowsay)
-library(skimr)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=- 
 
 
@@ -297,13 +296,13 @@ CPT_prob <- Prob %>%
 resampling <-  function(data, CPT_prob, year_forecast){
   
   
-  # data <- Cerete # Datos de estaciones a nivel diario. 
+  # data <- Cerete # Datos de estaciones a nivel diario.
   # 
   # # Datos de probabilidad cambiando a  Type - Season -  Prob
-  # CPT_prob <- Prob %>% 
-  #   .[,c(1, 4)] %>% 
+  # CPT_prob <- Prob %>%
+  #   .[,c(1, 4)] %>%
   #   set_names('NDJ', 'FMA') %>%
-  #   mutate(Type = c('Below', 'Normal', 'Above')) %>% 
+  #   mutate(Type = c('Below', 'Normal', 'Above')) %>%
   #   gather(Season, Prob, -Type)
   
   
@@ -367,6 +366,87 @@ resampling <-  function(data, CPT_prob, year_forecast){
   Times <- Times %>% 
     mutate(cat = purrr::map2(.x = cat, .y = month_data, .f = year_function))
   
+  
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  
+  
+  # =-=-=-=-=-=-=-=
+  library(trend)
+  
+  
+  # do_trend <- function(Daily_filter){
+  #   
+  #   Tmax <- dplyr::select(Daily_filter, tmax)
+  #   Tmx <- ts(data = Tmax, start = min(Tmax), end = max(Tmax))
+  #   sen_Tmax <- sens.slope(Tmx)
+  #   # t <- 1:length(Tmx)
+  #   
+  #   sen_Tmax$estimates * 1:length(Tmx)
+  #   
+  #   Tmin <- dplyr::select(Daily_filter, tmin) %>% data_frame() %>% as.vector()
+  #   Tmn <- ts(data = Tmin, start = min(Tmin), end = max(Tmin))
+  #   # sen_Tmin <- sens.slope(Tmin)
+  #   # length(Tmn)
+  # }
+  
+  
+  # =-=-=-=-=-=-=-=
+  
+  # day_sample <- function(Season, cat, data, Intial_year, last_year){
+  #   # data it's station data.  
+  #   # cat <-  Times %>%  dplyr::select(cat) %>% filter(row_number() < 2) %>% unnest
+  #   # Season <- 'NDJ'
+  #   
+  #   month_ini <- cat %>% 
+  #     dplyr::select(start_month) %>% 
+  #     unique() %>% 
+  #     as.numeric()
+  #   
+  #   month_end <- cat %>% 
+  #     dplyr::select(end_month) %>% 
+  #     unique() %>% 
+  #     as.numeric()
+  #   
+  #   # Filter by season data serie.
+  #   if(Season == 'NDJ'){
+  #     Daily_filter <- data %>%
+  #       filter(month %in% c(11,12,1)) %>% 
+  #       mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
+  #       filter(year_M >= (Intial_year + 1), year_M < (last_year + 1))%>%
+  #       mutate(year = year_M - 1) %>% 
+  #       dplyr::select(-year_M)
+  #     
+  #   } else if(Season == 'DJF'){
+  #     Daily_filter <- data %>%
+  #       filter(month %in% c(11,12,1)) %>% 
+  #       mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
+  #       filter(year_M >= (Intial_year + 1), year_M < (last_year +1 ))%>%
+  #       mutate(year = year_M - 1) %>% 
+  #       dplyr::select(-year_M)
+  #     
+  #   } else{
+  #     Daily_filter <-  data %>%
+  #       filter(between(month, month_ini, month_end)) 
+  #   }
+  #   
+  #   
+  #   # Aqui hay que agregar la parte la función do_trend...
+  #   Daily_filter
+  #   
+  # 
+  #     Daily_data <- cat %>% 
+  #     dplyr::select(-start_month, -end_month) %>% 
+  #     mutate(daily_data = purrr::map(.x = year, .f = function(.x){
+  #       Daily_filter %>% filter(year == .x)})) %>% 
+  #     dplyr::select(-year)
+  #   
+  # }
+  
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  
+  
+  
+  
   # This function extract daily data using sample year.  
   daily_data <- Times %>% 
     mutate(daily_data = purrr::map2(.x = Season, .y = cat, .f = day_sample, 
@@ -377,14 +457,33 @@ resampling <-  function(data, CPT_prob, year_forecast){
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
   
   
-  Escenaries <- daily_data %>% 
+  
+  data_to_esc <- daily_data %>% 
     unnest %>% 
     dplyr::select(-condtion) %>% 
     nest(-id) %>% 
-    mutate(data = purrr::map(.x = data, .f = function(.x){ .x %>%  unnest %>%   unnest() %>%  dplyr::select(-Season) })) %>% 
-    unnest %>% 
+    mutate(data = purrr::map(.x = data, .f = function(.x){ .x %>%  unnest %>%   unnest()})) %>% 
+    unnest
+  
+  
+  Escenaries <-  data_to_esc %>% 
+    dplyr::select(-Season) %>% 
     mutate(year = year_forecast) %>% 
     nest(-id)
+  
+  
+  
+  # Aqui se debe de crear un objeto extra que acompañe a Escenaries 
+  # Arreglar para que quede en el orden que debe...
+  data_to_esc %>% 
+    dplyr::select(id, Season, year) %>% 
+    group_by(Season) %>% 
+    unique %>%
+    spread(Season, year) %>% 
+    View
+  
+  
+  
   
   return(Escenaries)}
 
@@ -393,8 +492,8 @@ resampling <-  function(data, CPT_prob, year_forecast){
 
 # We are testing only for one file... but the idea it's have the other files 
 # and put the results in a specific folder. 
-cerete <- resampling(data = Cerete, CPT_prob = CPT_prob, 
-           year_forecast = year_forecast)
+# cerete <- resampling(data = Cerete, CPT_prob = CPT_prob, 
+#            year_forecast = year_forecast)
 
 
 
@@ -469,22 +568,22 @@ function_to_save <- function(station, Escenaries, path_out){
                       .f = function(.x, .y){ write_csv(x = .x, path = .y)})
   
   
-  summaries <- Esc_C %>% 
-    dplyr::select(data) %>% 
-    unnest %>% 
-    group_by(month, year) %>% 
-    summarise(prec_avg = mean(precip), prec_max = max(precip), prec_min = min(precip),
-              sol_rad_avg = mean(srad), sol_rad_max = max(srad), sol_rad_min = min(srad), 
-              t_max_avg = mean(tmax), t_max_max = max(tmax), t_max_min = min(tmax), 
-              t_min_avg = mean(tmin), t_min_max = max(tmin), t_min_min = min(tmin)) %>% 
-    gather(variable, value, -month, -year) %>% 
-    ungroup() %>% 
-    nest(-variable) %>% 
-    mutate(file_name = glue::glue('{path_out}{station}/{variable}.csv'))
-  
-  
-  walk2(.x = summaries$data, .y = summaries$file_name, 
-        .f = function(.x, .y){write_csv(x = .x, path = .y)})
+  # summaries <- Esc_C %>% 
+  #   dplyr::select(data) %>% 
+  #   unnest %>% 
+  #   group_by(month, year) %>% 
+  #   summarise(prec_avg = mean(precip), prec_max = max(precip), prec_min = min(precip),
+  #             sol_rad_avg = mean(srad), sol_rad_max = max(srad), sol_rad_min = min(srad), 
+  #             t_max_avg = mean(tmax), t_max_max = max(tmax), t_max_min = min(tmax), 
+  #             t_min_avg = mean(tmin), t_min_max = max(tmin), t_min_min = min(tmin)) %>% 
+  #   gather(variable, value, -month, -year) %>% 
+  #   ungroup() %>% 
+  #   nest(-variable) %>% 
+  #   mutate(file_name = glue::glue('{path_out}{station}/{variable}.csv'))
+  # 
+  # 
+  # walk2(.x = summaries$data, .y = summaries$file_name, 
+  #       .f = function(.x, .y){write_csv(x = .x, path = .y)})
   
 }
 
