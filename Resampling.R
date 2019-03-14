@@ -261,6 +261,41 @@ day_sample <- function(Season, cat, data, Intial_year, last_year){
 }
 
 
+# This function return a tibble with daily sceneries min and max. 
+Find_Summary <- function(daily_by_season){
+  # daily_by_season <-   data_to_esc %>% nest(-Season) %>%
+  # filter(Season == 'FMA') %>% dplyr::select(data) %>% unnest
+  
+  # Solo se hace la agrupacion mensual.
+  monthly <- daily_by_season %>% 
+    group_by(year) %>% 
+    summarise(monthly = sum(precip)) 
+  
+  # se extrae el minimo y maximo de la precipitacion. 
+  Min_Max <-  monthly %>% 
+    arrange(monthly) %>% 
+    slice(1,n()) %>% 
+    mutate(Type = c('min', 'max')) %>% 
+    dplyr::select(-monthly)
+  
+  
+  Lenght <-  daily_by_season %>% 
+    filter(year %in% Min_Max$year) %>% 
+    count(id) %>% 
+    filter(row_number() == 1) %>% 
+    dplyr::select(n) %>% 
+    as.numeric
+  
+  
+  
+  Indicators <-  daily_by_season %>% 
+    filter(year %in% Min_Max$year) %>% 
+    dplyr::select(-id) %>% 
+    unique %>%
+    mutate(Type = rep(Min_Max$Type, each = Lenght )) %>% 
+    nest(-Type)
+  
+  return(Indicators)}
 
  
 
@@ -483,65 +518,30 @@ resampling <-  function(data, CPT_prob, year_forecast){
     mutate(year = year_forecast) %>% 
     nest(-id) 
   
-  
-  
-  
 
-  
-  # Escenarios minimo y maximo. 
-  Find_Summary <- function(data_to_esc){
-    # daily_by_season <-   data_to_esc %>% nest(-Season) %>%  filter(Season == 'FMA')
-
-    # Solo se hace la agrupacion mensual.
-    test <- daily_by_season %>% 
-      group_by(year) %>% 
-      summarise(monthly = sum(precip)) 
-    
-    # se extrae el minimo y maximo de la precipitacion. 
-    Min_Max <-  test %>% 
-      arrange(monthly) %>% 
-      slice(1,n()) %>% 
-      mutate(Type = c('min', 'max')) %>% 
-      dplyr::select(-monthly)
-    
-    
-    
-    Indicators <- data_to_esc %>% 
-      filter(Season == 'FMA') %>% 
-      # dplyr::select(-id) %>% 
-      filter(year %in% Min_Max$year) 
-    
-    
-    
-    Lenght <- Indicators %>% 
-      count(id) %>% 
-      filter(row_number() == 1) %>% 
-      dplyr::select(n) %>% 
-      as.numeric
-    
-    
-    
-    Indicators <-  Indicators %>% 
-      dplyr::select(-id) %>% 
-      unique %>%
-      mutate(Type = rep(Min_Max$Type, each = Lenght )) %>% 
-      nest(-Type, -Season)
-    
-  return(Indicators)}
-  
+  # Here was Find_Summary function
  
+  # In this part we create sceneries with min and max years 
+  # (building from aggregate precipitation).
+  Esc_Type <- data_to_esc %>%
+    nest(-Season) %>%
+    mutate(Summary = purrr::map(.x = data, .f = Find_Summary)) %>% 
+    dplyr::select(-data) %>% 
+    unnest() %>% 
+    unnest %>% 
+    arrange(Type) %>% 
+    dplyr::select(-Season) %>% 
+    nest(-Type)
+    
+  
+  # This object is the mix with 3 data set (sceneries, sample years and sceneries types).
+  All_data <- bind_cols( Escenaries %>% mutate(Row = 'a') %>% nest(-Row),
+             Base_years %>% mutate(Row = 'a') %>% nest(-Row) %>% rename(Base_years = 'data')) %>% 
+    bind_cols(Esc_Type %>% mutate(Row = 'a') %>% nest(-Row) %>% rename(Esc_Type = 'data') ) %>% 
+    dplyr::select(-Row1, -Row2) 
   
   
-  
-  
-  
-  
-  
-  # Pensando como arreglar esto... porque meno toca arreglar varias funciones. 
-  # Escenaries <- bind_cols( Escenaries, 
-  #            Base_years %>% nest(-id) %>% dplyr::select(-id) %>% rename(Base_years = 'data'))
-  
-  return(Escenaries)}
+  return(All_data)}
 
 
 
@@ -597,10 +597,29 @@ tictoc::tic()
 Resam <- Initial_data %>% 
   mutate(Escenaries = purrr::map2(.x = stations, .y = CPT_prob, 
                                   .f = resampling, year_forecast = year_forecast))
-tictoc::toc() # less than one minute.
+tictoc::toc() # 28.82 -- less than one minute.
 
 
-# 
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# Aquí hay que agregar todo lo de descarga de Chirps y de NASA Power... además agregar a Resam
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+# Funcion de Chirps. 
+
+
+# Funcion de NASA Power.
+
+# También hay que revisar la lectura del archivo de datos... preguntarle a ed.
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+# Aqui hay que poner los guardados extra de 
 path_out <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/results/'
 
 
