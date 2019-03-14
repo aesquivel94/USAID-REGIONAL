@@ -369,6 +369,19 @@ resampling <-  function(data, CPT_prob, year_forecast){
   
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   
+ Base_years <- Times %>% 
+    mutate(order = paste0(letters[1:2], '.',Season)) %>% 
+    dplyr::select(order, cat) %>% 
+    unnest %>%
+    dplyr::select(order, year) %>% 
+    nest(-order) %>%
+    spread(key = order, value = data) %>%
+    unnest %>% 
+    set_names(paste0(letters[1:2], '.',  Times$Season)) %>% 
+    bind_cols(id = 1:100, .)
+  
+  
+  
   
   # =-=-=-=-=-=-=-=
   library(trend)
@@ -457,7 +470,6 @@ resampling <-  function(data, CPT_prob, year_forecast){
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
   
   
-  
   data_to_esc <- daily_data %>% 
     unnest %>% 
     dplyr::select(-condtion) %>% 
@@ -469,21 +481,65 @@ resampling <-  function(data, CPT_prob, year_forecast){
   Escenaries <-  data_to_esc %>% 
     dplyr::select(-Season) %>% 
     mutate(year = year_forecast) %>% 
-    nest(-id)
+    nest(-id) 
   
   
   
-  # Aqui se debe de crear un objeto extra que acompañe a Escenaries 
-  # Arreglar para que quede en el orden que debe...
-  data_to_esc %>% 
-    dplyr::select(id, Season, year) %>% 
-    group_by(Season) %>% 
-    unique %>%
-    spread(Season, year) %>% 
-    View
+  
+
+  
+  # Escenarios minimo y maximo. 
+  Find_Summary <- function(data_to_esc){
+    # daily_by_season <-   data_to_esc %>% nest(-Season) %>%  filter(Season == 'FMA')
+
+    # Solo se hace la agrupacion mensual.
+    test <- daily_by_season %>% 
+      group_by(year) %>% 
+      summarise(monthly = sum(precip)) 
+    
+    # se extrae el minimo y maximo de la precipitacion. 
+    Min_Max <-  test %>% 
+      arrange(monthly) %>% 
+      slice(1,n()) %>% 
+      mutate(Type = c('min', 'max')) %>% 
+      dplyr::select(-monthly)
+    
+    
+    
+    Indicators <- data_to_esc %>% 
+      filter(Season == 'FMA') %>% 
+      # dplyr::select(-id) %>% 
+      filter(year %in% Min_Max$year) 
+    
+    
+    
+    Lenght <- Indicators %>% 
+      count(id) %>% 
+      filter(row_number() == 1) %>% 
+      dplyr::select(n) %>% 
+      as.numeric
+    
+    
+    
+    Indicators <-  Indicators %>% 
+      dplyr::select(-id) %>% 
+      unique %>%
+      mutate(Type = rep(Min_Max$Type, each = Lenght )) %>% 
+      nest(-Type, -Season)
+    
+  return(Indicators)}
+  
+ 
   
   
   
+  
+  
+  
+  
+  # Pensando como arreglar esto... porque meno toca arreglar varias funciones. 
+  # Escenaries <- bind_cols( Escenaries, 
+  #            Base_years %>% nest(-id) %>% dplyr::select(-id) %>% rename(Base_years = 'data'))
   
   return(Escenaries)}
 
