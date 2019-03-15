@@ -630,7 +630,7 @@ function_to_save <- function(station, Esc_all, path_out){
   # station <- data %>% dplyr::select(names)
   # Esc_all <- data %>% dplyr::select(Escenaries) %>% unnest
   
-  # Escenarios diarios (generados con el remuestreo)
+  # Daily sceneries (generated with resampling).
   Escenaries <- Esc_all %>%
     dplyr::select(data) %>% 
     unnest
@@ -638,17 +638,16 @@ function_to_save <- function(station, Esc_all, path_out){
   Esc_C <- Escenaries %>% 
     mutate(file_name = glue::glue('{path_out}{station}/escenario_{id}.csv')) 
   
-  # Creacion del folder de datos... (donde se van a guardar los resultados). 
+  # Creation of the data folder (where the results will be saved). 
   ifelse(dir.exists(glue::glue('{path_out}{station}')) == FALSE, 
          dir.create(glue::glue('{path_out}{station}')), 'ok')
 
-  # Guarda los escenarios diarios. 
+  # Save daily sceneries.
   walk2(.x = Esc_C$data, .y = Esc_C$file_name, 
                       .f = function(.x, .y){ write_csv(x = .x, path = .y)})
   
   
-  # Guardado de escenarios tipo. 
-  
+  # Save scenarios type. 
   Type_Esc <- Esc_all %>% 
     dplyr::select(Esc_Type) %>% 
     unnest %>% 
@@ -658,7 +657,7 @@ function_to_save <- function(station, Esc_all, path_out){
         .f = function(.x, .y){ write_csv(x = .x, path = .y)})
   
   
-  # Guardado de los years del remuestreo.
+  # Save resampling years.
   Esc_all %>% 
     dplyr::select(Base_years) %>% 
     unnest %>% 
@@ -667,25 +666,24 @@ function_to_save <- function(station, Esc_all, path_out){
 
   
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  # summary variables files creation.
   Levels <- Esc_C %>% 
     dplyr::select(data) %>% 
     unnest %>% 
     dplyr::select(month) %>% 
     unique 
   
-  
-  
 
   summaries <- Esc_C %>% 
     dplyr::select(id, data) %>% 
     unnest %>% 
-    # mutate(month = x = fct_recode(month, Levels)) %>% 
+    mutate(month = factor(month,Levels$month))  %>% 
     group_by(id, month, year) %>% 
     summarise(precip = sum(precip), tmax = mean(tmax), tmin = mean(tmin), srad = mean(srad)) %>% 
     ungroup() %>% 
     dplyr::select(-id) %>%
     group_by(month) %>%
-      group_by(month, year) %>%
+      group_by(year, month) %>%
       summarise(prec_avg = mean(precip), prec_max = max(precip), prec_min = min(precip),
                 sol_rad_avg = mean(srad), sol_rad_max = max(srad), sol_rad_min = min(srad),
                 t_max_avg = mean(tmax), t_max_max = max(tmax), t_max_min = min(tmax),
@@ -693,29 +691,26 @@ function_to_save <- function(station, Esc_all, path_out){
     ungroup()
     
     
-  
-  summaries %>% 
-    mutate(month = as.factor(month)) %>% 
-    dplyr::select(month) %>% 
-    fct_infreq() %>%
-    
-  
-  
-    
-    # %>% 
-    # arrange(., month = Levels)
-      # gather(variable, value, -month, -year) %>%
+   
+  summaries <- summaries %>% 
+    gather(variable, values, -month, -year) %>% 
+    nest(-variable) %>% 
+    mutate(data = purrr::map2(.x = variable, .y = data, .f = function(.x, .y){
       
-      
-    
-  
-  
-  arrange(summaries, month, .by_group = Levels)
-  
+      if(str_detect(.x , 'sol_rad_') == TRUE){
+        .y <- .y  %>% 
+          set_names(c('year', 'month', str_remove(.x , 'sol_rad_')))
+      } else{
+        .y <- .y  %>% 
+          set_names(c('year', 'month', str_extract( .x ,'_[a-z]+') %>% str_remove('_')))
+      }
+      return(.y)})) %>% 
+  mutate(file_name = glue::glue('{path_out}{station}/{variable}.csv'))
 
-
-  # walk2(.x = summaries$data, .y = summaries$file_name,
-  #       .f = function(.x, .y){write_csv(x = .x, path = .y)})
+  
+  # Aqui se guardan los archivos...
+  walk2(.x = summaries$data, .y = summaries$file_name,
+        .f = function(.x, .y){write_csv(x = .x, path = .y)})
   
 }
 
