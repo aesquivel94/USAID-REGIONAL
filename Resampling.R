@@ -624,40 +624,97 @@ path_out <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resamplin
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-function_to_save <- function(station, Escenaries, path_out){
+function_to_save <- function(station, Esc_all, path_out){
   
   # data <- Resam %>%  filter(row_number() == 1) %>%  dplyr::select(names, Escenaries)
   # station <- data %>% dplyr::select(names)
-  # Escenaries <- data %>% dplyr::select(Escenaries) %>% unnest
+  # Esc_all <- data %>% dplyr::select(Escenaries) %>% unnest
+  
+  # Escenarios diarios (generados con el remuestreo)
+  Escenaries <- Esc_all %>%
+    dplyr::select(data) %>% 
+    unnest
   
   Esc_C <- Escenaries %>% 
     mutate(file_name = glue::glue('{path_out}{station}/escenario_{id}.csv')) 
   
-  
+  # Creacion del folder de datos... (donde se van a guardar los resultados). 
   ifelse(dir.exists(glue::glue('{path_out}{station}')) == FALSE, 
          dir.create(glue::glue('{path_out}{station}')), 'ok')
-  
-  
 
+  # Guarda los escenarios diarios. 
   walk2(.x = Esc_C$data, .y = Esc_C$file_name, 
                       .f = function(.x, .y){ write_csv(x = .x, path = .y)})
   
   
-  # summaries <- Esc_C %>% 
-  #   dplyr::select(data) %>% 
-  #   unnest %>% 
-  #   group_by(month, year) %>% 
-  #   summarise(prec_avg = mean(precip), prec_max = max(precip), prec_min = min(precip),
-  #             sol_rad_avg = mean(srad), sol_rad_max = max(srad), sol_rad_min = min(srad), 
-  #             t_max_avg = mean(tmax), t_max_max = max(tmax), t_max_min = min(tmax), 
-  #             t_min_avg = mean(tmin), t_min_max = max(tmin), t_min_min = min(tmin)) %>% 
-  #   gather(variable, value, -month, -year) %>% 
-  #   ungroup() %>% 
-  #   nest(-variable) %>% 
-  #   mutate(file_name = glue::glue('{path_out}{station}/{variable}.csv'))
-  # 
-  # 
-  # walk2(.x = summaries$data, .y = summaries$file_name, 
+  # Guardado de escenarios tipo. 
+  
+  Type_Esc <- Esc_all %>% 
+    dplyr::select(Esc_Type) %>% 
+    unnest %>% 
+    mutate(file_name = glue::glue('{path_out}{station}/escenario_{Type}.csv'))
+  
+  walk2(.x = Type_Esc$data, .y = Type_Esc$file_name, 
+        .f = function(.x, .y){ write_csv(x = .x, path = .y)})
+  
+  
+  # Guardado de los years del remuestreo.
+  Esc_all %>% 
+    dplyr::select(Base_years) %>% 
+    unnest %>% 
+    write_csv(., path = glue::glue('{path_out}{station}/Escenario_A.csv'))
+  
+
+  
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  Levels <- Esc_C %>% 
+    dplyr::select(data) %>% 
+    unnest %>% 
+    dplyr::select(month) %>% 
+    unique 
+  
+  
+  
+
+  summaries <- Esc_C %>% 
+    dplyr::select(id, data) %>% 
+    unnest %>% 
+    # mutate(month = x = fct_recode(month, Levels)) %>% 
+    group_by(id, month, year) %>% 
+    summarise(precip = sum(precip), tmax = mean(tmax), tmin = mean(tmin), srad = mean(srad)) %>% 
+    ungroup() %>% 
+    dplyr::select(-id) %>%
+    group_by(month) %>%
+      group_by(month, year) %>%
+      summarise(prec_avg = mean(precip), prec_max = max(precip), prec_min = min(precip),
+                sol_rad_avg = mean(srad), sol_rad_max = max(srad), sol_rad_min = min(srad),
+                t_max_avg = mean(tmax), t_max_max = max(tmax), t_max_min = min(tmax),
+                t_min_avg = mean(tmin), t_min_max = max(tmin), t_min_min = min(tmin)) %>%
+    ungroup()
+    
+    
+  
+  summaries %>% 
+    mutate(month = as.factor(month)) %>% 
+    dplyr::select(month) %>% 
+    fct_infreq() %>%
+    
+  
+  
+    
+    # %>% 
+    # arrange(., month = Levels)
+      # gather(variable, value, -month, -year) %>%
+      
+      
+    
+  
+  
+  arrange(summaries, month, .by_group = Levels)
+  
+
+
+  # walk2(.x = summaries$data, .y = summaries$file_name,
   #       .f = function(.x, .y){write_csv(x = .x, path = .y)})
   
 }
