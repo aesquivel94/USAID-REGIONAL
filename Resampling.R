@@ -681,6 +681,39 @@ download_data_nasa <- function(lat,lon,year_to,month_to,data_d){
 #---------------------------------------------------------------------------------#
 #-------------- Function to extract Chirp daily data. ----------------------------#
 #---------------------------------------------------------------------------------#
+# INPUT
+# lat: latitud de la estaciÃ³n/sitio de interÃ©s
+# lon: longitud de la estaciÃ³n/sitio de interÃ©s
+# ini.date: fecha inicio de descarga
+# end.date: fecha final de descarga
+# outDir: Directorio donde se guardarÃ¡n las imagenes de chirps
+# OUTPUT
+# Datos diarios de precipitaciÃ³n de CHIRP
+
+# ini.date <- 
+# end.date <- 
+# outDir <- 
+# cl <- 
+  
+download_data_chirp = function(ini.date,end.date,year_to,outDir,cl){
+  
+  z=seq(as.Date(ini.date), as.Date(end.date), "days")
+  fechas=str_replace_all(z, "-", ".")  
+  
+  urls <- paste("ftp://ftp.chg.ucsb.edu/pub/org/chg/products/CHIRP/daily/",year_to,"/chirp.",fechas,".tif",sep="")
+  file <- basename(urls)
+  outDir_all = paste0(outDir,"/",file)
+  
+  
+  clusterMap(cl, download.file, url = urls, destfile = outDir_all, mode = "wb", 
+             .scheduling = 'dynamic')
+  
+  return("Datos de CHIRPS descargados!")
+}
+
+
+
+
 
 
 
@@ -688,6 +721,53 @@ download_data_nasa <- function(lat,lon,year_to,month_to,data_d){
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+#---------------------------------------------------------------------------------#
+#-----------------Exporta los escenarios a nivel diario a .csv--------------------#
+#---------------------------------------------------------------------------------#
+cat("\n Descargando datos observados de NASA POWER... \n")
+
+if (substring(Sys.Date(),6,7) == "01"){
+  year_to = as.numeric(format(Sys.Date(),"%Y"))-1
+  month_to = 12
+} else {
+  year_to = format(Sys.Date(),"%Y")
+  month_to = as.numeric(format(Sys.Date(),"%m"))-1
+}
+
+data_nasa = download_data_nasa(data_coord$lat,data_coord$lon,year_to,month_to,data_d)
+
+cat("\n Extrayendo datos estimados de CHIRP... \n")
+
+
+
+outDir_all = list.files(path_output,pattern = ".tif",full.names = T )
+trs = list()
+for(j in 1:length(outDir_all)){ trs[[j]] <- raster(outDir_all[j]) }
+
+trs_st = stack(trs)
+
+extr_vals <- raster::extract(trs_st, data.frame(x=data_coord$lon,y=data_coord$lat))
+data_chirp <- as.numeric(extr_vals)
+
+
+z=seq(as.Date(ini.date), as.Date(end.date), "days")
+data_obs_m =  cbind.data.frame("day" = as.numeric(format(z,"%d")),"month" = as.numeric(format(z,"%m")), "year" = as.numeric(format(z,"%Y")),"t_max"= data_nasa$t_max,"t_min"=data_nasa$t_min,"prec" = data_chirp,"sol_rad" = data_nasa$sol_rad)
+for(k in 1:nrow(escenarios_final)){
+  to.write = rbind.data.frame( data_obs_m,esc_final_diarios[[k]])
+  write.csv(to.write,paste(path_output,"/",station,"/escenario_",nom[k],".csv",sep=""),row.names=F)
+}
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+
+
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
