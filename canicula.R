@@ -1,7 +1,7 @@
 rm(list = ls()); gc(reset = TRUE)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Made by:     Alejandra Esquivel Arias. 
-# Created in:  Date: 2-2019
+# Created in:  Date: 3-2019
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Canícula (Midsummer Drought) Methodology.
 
@@ -23,6 +23,7 @@ library(pracma)
 library(cowsay)
 library(sf)
 library(skimr)
+library(gganimate)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 
 
@@ -30,7 +31,13 @@ library(skimr)
 # Chirps data.
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 
-
+# .------..------..------..------..------..------.
+# |C.--. ||H.--. ||I.--. ||R.--. ||P.--. ||S.--. |
+# | :/\: || :/\: || (\/) || :(): || :/\: || :/\: |
+# | :\/: || (__) || :\/: || ()() || (__) || :\/: |
+# | '--'C|| '--'H|| '--'I|| '--'R|| '--'P|| '--'S|
+# `------'`------'`------'`------'`------'`------'
+                              '                                  '             
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 # Path --- where are files.
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
@@ -503,12 +510,21 @@ MSD_data %>%
   skimr::skim(.)  
 
 
+# Summary for each year... Count NA data.
+MSD_data %>%
+  dplyr::select(-data, -id)  %>% 
+  unnest %>% 
+  na_if(-999) %>%
+  dplyr::select( year, Length) %>% 
+  group_by(year) %>% 
+  skimr::skim(.) 
+
+
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Testing gganimate for do animation graphs.
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-library(gganimate)
 # =-=-=-=-=-=-=-=
 shp <- st_as_sf(HM_shp) 
 dry_C <- read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Honduras_Corredor_Seco.shp') 
@@ -516,31 +532,30 @@ dry_C <- read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Hond
 
 
 p_data  <- MSD_data %>%
-  # dplyr::select(-data, -id)  %>% 
-  # unnest %>% 
+  dplyr::select(-data, -id)  %>%
+  unnest %>%
   na_if(-999) %>% 
-  dplyr::select(year,  x, y, Intensity) %>% 
-  # filter(between(year, 2015, 2018)) %>% 
+  # dplyr::select(year,  x, y, Magnitude ) %>% 
+  # filter(between(year, 2015, 2018)) %>%
   mutate(year = as.integer(year)) 
 
 p_data %>% dplyr::select(year) %>% unique
 
 
-anim <-  ggplot(p_data) +
-  geom_tile(aes(x, y, fill = Intensity)) + 
-  scale_fill_viridis(na.value="white") + 
+anim <- ggplot(p_data) +
+  geom_tile(aes(x, y, fill = Magnitude )) + 
+  scale_fill_viridis(na.value="white",  direction = -1) + 
   geom_sf(data = shp, fill = NA, color = gray(.5)) +
   geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
   theme_bw() +
   # Here comes the gganimate specific bits
-  labs(title = 'Year: {frame_time}', x = 'Longitud', y = 'Latitud') + 
-  transition_time(year) # +
-  # ease_aes('linear')
+  labs(title = 'Year: {closest_state}', x = 'Longitud', y = 'Latitud') + 
+  transition_states(year, transition_length = 5, state_length = 8) +
+  enter_fade() +
+  exit_fade()
 
 
-# animate(anim, renderer = ffmpeg_renderer())
-
-anim_save("filenamehere.gif", anim)
+anim_save("MSD_Index/Magnitude_Chirps.gif", anim)
 
 
 # MSD_data %>%
@@ -553,6 +568,39 @@ anim_save("filenamehere.gif", anim)
 #   theme_bw() + 
 #   labs(x = NULL, y = NULL)
   
+
+
+
+
+
+
+
+# =-=-=-=-= Generación de los gif para las series de tiempo. 
+i <- 300
+
+index <- MSD_data %>% 
+  filter(row_number() == i) %>%
+  dplyr::select(MSD) %>% 
+  unnest
+
+print(index)
+
+MSD_data %>% 
+  filter(row_number() == i) %>% 
+  dplyr::select(data) %>% 
+  unnest %>% 
+  filter(between(month, 5, 9)) %>% 
+  ggplot() + 
+  geom_line(aes(julian, mov)) +
+  theme_bw() +
+  labs(x = 'Día Juliano', y = "Promedio Triangular (mm)")
+
+
+
+
+
+
+ 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-  
   
 # =-=-=-=-=-=-=-=
@@ -680,6 +728,14 @@ CPT_file(data = MSD_data, var = 'Magnitude')
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 # Station data.
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
+
+# .------..------..------..------..------..------..------..------.
+# |S.--. ||T.--. ||A.--. ||T.--. ||I.--. ||O.--. ||N.--. ||S.--. |
+# | :/\: || :/\: || (\/) || :/\: || (\/) || :/\: || :(): || :/\: |
+# | :\/: || (__) || :\/: || (__) || :\/: || :\/: || ()() || :\/: |
+# | '--'S|| '--'T|| '--'A|| '--'T|| '--'I|| '--'O|| '--'N|| '--'S|
+# `------'`------'`------'`------'`------'`------'`------'`------'
+
 
 
 Station <- read_csv("station_data/Data_diaria_copeco/prec_daily_qc.csv") %>% 
@@ -864,6 +920,28 @@ test <- new_JointCS %>%
   nest(-year, -id)
 
  
+choluteca <- new_JointCS %>% 
+  dplyr::select(station_N , data) %>% 
+  filter(row_number() == 27) %>% 
+  unnest
+
+
+choluteca %>% 
+  dplyr::select(year, date, date, prec, prec_C) %>% 
+  filter(year == 2017) %>% 
+  ggplot(.) + 
+  geom_line(aes(date, prec_C), colour = 'red') + 
+  geom_line(aes(date, prec)) + 
+  theme_bw() +
+  labs(x = NULL, y = 'Precipitación (mm)') + 
+  geom_vline( xintercept = as.numeric(as.Date("2017-05-01")), linetype=4, colour = 'blue') +
+  geom_vline( xintercept = as.numeric(as.Date("2017-09-01")), linetype=4, colour = 'blue')
+  
+  
+
+
+
+
 # row_test <- test %>% 
 #   filter(row_number() == 300) 
 #   
@@ -901,25 +979,28 @@ proof %>%
 
 
 
-
-
-
 graph <- proof %>% 
-  filter(year == 2017) %>% 
+  # filter(year == 2017) %>% 
   dplyr::select(-data) %>%
   unnest %>% 
-  na_if(-999) 
+  na_if(-999) %>% 
+  mutate(year = as.integer(year))
 
 
  
-  ggplot(graph , aes(x, y, fill = Magnitude)) +
-  geom_tile() +  
-  scale_fill_viridis() + 
-  # geom_sf(data = shp, fill = NA, color = gray(.5)) +
-  # geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  anim <- ggplot(graph) +
+  geom_point(aes(x, y, colour = Magnitude)) +  
+  scale_colour_viridis(na.value="white",  direction = -1) +  
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
   theme_bw() + 
-  labs(x = NULL, y = NULL) # + 
-  # geom_point(data = Honduras_art, aes(x, y))
+  geom_point(data = Honduras_art, aes(x, y)) +
+    # Here comes the gganimate specific bits
+  labs(title = 'Year: {frame_time}', x = 'Longitud', y = 'Latitud') + 
+  transition_time(year)
+  
+  anim_save("MSD_Index/Magnitude_stations.gif", anim)
+  
 
 
 # Hacer un comparativo en esos puntos por lo menos para la estación 
@@ -929,6 +1010,22 @@ graph <- proof %>%
 # Intentar hacer el llenado de datos (modelo-por año)...
 
 
+  choluteca_MSD <- proof %>% 
+    dplyr::select(id, year, MSD) %>%
+    filter(id == 'X78724_choluteca', year == 2004) %>% 
+    unnest
 
-
-
+  
+  
+choluteca %>% 
+    filter(year == 2017) %>% 
+    filter(between(month, 5, 9)) %>% 
+    ggplot(.) +
+    geom_line(aes(julian, mov)) + 
+    geom_vline( xintercept = c(choluteca_MSD$Start, choluteca_MSD$End), 
+                linetype=4, colour = 'blue') +
+   geom_vline(xintercept = c(choluteca_MSD$Min), 
+              linetype=4, colour = 'skyblue') + 
+  theme_bw()
+    
+  
