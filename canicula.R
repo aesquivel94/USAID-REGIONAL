@@ -558,42 +558,54 @@ anim <- ggplot(p_data) +
 anim_save("MSD_Index/Magnitude_Chirps.gif", anim)
 
 
-# MSD_data %>%
-#   dplyr::select(-data, -id) %>%
-#   unnest %>%
-#   filter(year == 2018) %>% 
-#   mutate(Intensity = ifelse(Intensity != -999, Intensity, NA)) %>%  
-#   ggplot(aes(x, y, fill = Intensity)) +
-#   geom_raster() + 
-#   theme_bw() + 
-#   labs(x = NULL, y = NULL)
-  
-
-
-
-
-
-
-
 # =-=-=-=-= Generación de los gif para las series de tiempo. 
-i <- 300
+library(magick)
+# library(ggplot2)
 
-index <- MSD_data %>% 
-  filter(row_number() == i) %>%
-  dplyr::select(MSD) %>% 
-  unnest
+MSD_data1 <- MSD_data %>% 
+  mutate(MSD = purrr::map2(.x = MSD, year,.f = function(.x, .y){
+    .x <- .x %>% 
+      mutate(year = .y)
+  }))
 
-print(index)
 
-MSD_data %>% 
-  filter(row_number() == i) %>% 
-  dplyr::select(data) %>% 
-  unnest %>% 
-  filter(between(month, 5, 9)) %>% 
-  ggplot() + 
-  geom_line(aes(julian, mov)) +
-  theme_bw() +
-  labs(x = 'Día Juliano', y = "Promedio Triangular (mm)")
+
+Individual_graph <- function(Data_index, Data){
+  # Data_index<- MSD_data1$MSD[[1]]
+  # Data <- MSD_data1$data[[1]]
+  
+  Data_index <- Data_index %>% 
+    na_if(-999)
+  
+  graph <-  Data  %>% 
+    filter(between(month, 5, 10)) %>% 
+    ggplot() + 
+    geom_line(aes(julian, mov)) +
+    theme_bw() +
+    labs(x = 'Día Juliano', y = "Promedio Triangular (mm)") + 
+    geom_vline( xintercept = c(Data_index$Start, Data_index$End), linetype=4, colour = 'blue') +
+    geom_vline(xintercept = Data_index$Min,  linetype=4, colour = 'skyblue') + 
+    labs(title = glue::glue('Id {Data_index$id}: Lon {Data_index$x} - Lat {Data_index$y} --- year {Data_index$year}'))
+  
+  print(graph)
+}
+
+
+
+img <- image_graph(600, 340, res = 96)
+
+out <- purrr::map2(.x = MSD_data1$MSD[151:300] , 
+                   .y = MSD_data1$data[151:300] , 
+                   .f = Individual_graph)
+
+dev.off()
+
+
+animation <- image_animate(img, fps = 2)
+# print(animation)
+
+image_write(animation, "Testing.gif")
+# rm(MSD_data1)
 
 
 
@@ -604,59 +616,28 @@ MSD_data %>%
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-  
   
 # =-=-=-=-=-=-=-=
-Honduras_art <- tibble(x = -c(87.65, 87.15, 87.22), y = c(13.29, 13.32,14.06)) 
+Honduras_art <- tibble(x = -c(87.65, 87.15, 87.22), y = c(13.29, 13.32,14.06))
 
-a <- MSD_data %>%
-  dplyr::select(-data, -id) %>%
-  unnest %>%
-  group_by(id, x, y) %>% 
-  summarise(percent = round(sum(Start == -999)/37, 2)*100)   %>% 
-  filter(percent < 40)
-
-
- # f <- 
-   
-  ggplot(a) +
-  geom_tile(aes(x, y, fill = percent))  + 
-  scale_fill_viridis() + 
-  geom_sf(data = shp, fill = NA, color = gray(.5)) +
-  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
-  theme_bw() + 
-  labs(x = NULL, y = NULL, fill = 'NA %') + 
-  geom_point(data = Honduras_art, aes(x, y))
+# a <- MSD_data %>%
+#   dplyr::select(-data, -id) %>%
+#   unnest %>%
+#   group_by(id, x, y) %>% 
+#   summarise(percent = round(sum(Start == -999)/37, 2)*100)   %>% 
+#   filter(percent < 40)
+# 
+# 
+#  # f <-  ggplot(a) +
+#   geom_tile(aes(x, y, fill = percent))  + 
+#   scale_fill_viridis() + 
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+#   theme_bw() + 
+#   labs(x = NULL, y = NULL, fill = 'NA %') + 
+#   geom_point(data = Honduras_art, aes(x, y))
 
   
- 
- 
- 
- 
- 
 
- # prec
- 
- 
- test <- id_year_prec %>% 
-   unnest %>% 
-   filter(between(month, 5, 10)) %>% 
-   group_by(id, x, y,  year) %>% 
-   summarise(acum = sum(prec)) %>% 
-   ungroup() %>% 
-   group_by(id, x, y) %>% 
-   summarise(mean = mean(acum))
-   
-   
-   ggplot(test , aes(x, y, fill = mean)) + 
-   geom_tile() +  
-   scale_fill_viridis() + 
-   geom_sf(data = shp, fill = NA, color = gray(.5)) +
-   geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
-   theme_bw() + 
-   labs(x = NULL, y = NULL, fill = 'NA %') + 
-   geom_point(data = Honduras_art, aes(x, y))
- 
- 
- 
-  
+
  
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Do CPT file.
