@@ -591,23 +591,28 @@ Individual_graph <- function(Data_index, Data){
 }
 
 
+by_id <- function(MSD_Local, id_pixel){
+  # MSD_Local <- MSD_data1 %>%  filter(id == 2)
 
-img <- image_graph(600, 340, res = 96)
+  img <- image_graph(600, 340, res = 96)
+  out <- purrr::map2(.x = MSD_Local$MSD, 
+                     .y = MSD_Local$data, 
+                     .f = Individual_graph)
+  dev.off()
+  
+  animation <- image_animate(img, fps = 2)
+  # print(animation)
+  image_write(animation, glue::glue("MSD_Index/Chirps_series_by_id/id_{id_pixel}.gif"))
+}
 
-out <- purrr::map2(.x = MSD_data1$MSD[151:300] , 
-                   .y = MSD_data1$data[151:300] , 
-                   .f = Individual_graph)
-
-dev.off()
-
-
-animation <- image_animate(img, fps = 2)
-# print(animation)
-
-image_write(animation, "Testing.gif")
+tictoc::tic()
+MSD_data1 %>%  
+  dplyr::select(-year) %>% 
+  nest(-id) %>% 
+  filter(row_number() == 3 ) %>% 
+  mutate(try = purrr::map2(.x = data, .y = id, .f = by_id))
+tictoc::toc()
 # rm(MSD_data1)
-
-
 
 
 
