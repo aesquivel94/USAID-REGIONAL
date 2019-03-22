@@ -609,9 +609,8 @@ tictoc::tic()
 MSD_data1 %>%  
   dplyr::select(-year) %>% 
   nest(-id) %>% 
-  filter(row_number() == 3 ) %>% 
   mutate(try = purrr::map2(.x = data, .y = id, .f = by_id))
-tictoc::toc()
+tictoc::toc() # 1.47 h
 # rm(MSD_data1)
 
 
@@ -722,7 +721,7 @@ CPT_file(data = MSD_data, var = 'Magnitude')
 # | '--'S|| '--'T|| '--'A|| '--'T|| '--'I|| '--'O|| '--'N|| '--'S|
 # `------'`------'`------'`------'`------'`------'`------'`------'
 
-
+# Read data
 
 Station <- read_csv("station_data/Data_diaria_copeco/prec_daily_qc.csv") %>% 
   filter(year > 1981) 
@@ -735,6 +734,16 @@ Station %>%
   dplyr::select(-day, -month, -year) %>% 
   skimr::skim(.) 
 
+# Count NA total.
+Count_NA <- Station %>% 
+  dplyr::select(-day, -month, -year)  %>%  # replace to your needs
+  summarise_all(funs(sum(is.na(.)))) %>% 
+  gather() %>% 
+  mutate(percent = round(value / 13149 * 100, 2))
+
+
+# Count_NA %>% write_csv('MSD_Index/Count_NA_Stations.csv')
+# arrange(Count_NA, percent) %>% View
 
  
 # Lat and Long
@@ -770,11 +779,7 @@ Station_Chirps <- raster::extract(HND, Catalog_M %>% dplyr::select(Lon, Lat)) %>
   nest(-station_N)
 
 
-
-
 # MSD_data <- read_csv('MSD_Index/MSD_G.csv')
-
-
 
 # Function for do dates...
 do_dates <- function(Chirps_S){
@@ -802,13 +807,19 @@ StationM <- Station %>%
 
 
 
-# =-=-=-=-=- corregir esta parte
+# =-=-=-=-=- 
 # nrow( Station_Chirps %>% filter(year < 2018)) == nrow(StationM)
 Joint_CS <-  inner_join(StationM, Station_Chirps %>%  filter(year < 2018)) %>% 
   dplyr::select(-layer) %>% 
-  nest(-station_N, -Lon , -Lat)
+  nest(-station_N, -Lon , -Lat) %>%  
+  mutate(NA_percent = purrr::map(.x = data,.f = function(.x){
+    .x %>% summarise(NA_percent = sum(is.na(prec))/n() * 100)})) %>% 
+  unnest(NA_percent) %>% 
+  filter(NA_percent <= 25)
 
 
+# =-=-=-=-=- Esta parte se adiciono. 
+# Filtrar para eliminar las estaciones que tengan más del 25% de datos NA 
 
 # No idea but, i want to save this... 
 year_Join_CS <- Joint_CS %>% 
@@ -816,13 +827,11 @@ year_Join_CS <- Joint_CS %>%
   nest(-station_N, -Lon,   -Lat, -year)
 
 
-
-  
-Joint_CS %>% 
-  dplyr::select(data) %>% 
-  filter(row_number() == 1) %>% 
-  unnest  %>% 
-  slice(n()) 
+# Joint_CS %>% 
+#   dplyr::select(data) %>% 
+#   filter(row_number() == 1) %>% 
+#   unnest  %>% 
+#   slice(n()) 
 
 
 
@@ -840,6 +849,18 @@ idea_models <- Joint_CS %>%
 tidy_models <- idea_models %>% 
   tidy(fitHour)
 
+
+
+Joint_CS %>% 
+  unnest %>% 
+  group_by(station_N) %>% 
+  na.omit() %>% 
+  do(fitHour = confint_tidy(lm(prec ~ Chirps, data = .))  ) %>% 
+  unnest
+
+
+glance(idea_models, fitHour) %>% 
+  write_csv('MSD_Index/Station_models.csv')
 
 #  fitted values and residuals 
 # augment(idea_models, fitHour)
@@ -877,7 +898,7 @@ filling_data <- function(data, coefficient){
     
 return(Fill_data)}
 
-
+# =-=-=-=-=-=-=
 # Fix this part
 new_JointCS <- Joint_CS %>%
   right_join(., coef) %>% 
@@ -886,6 +907,44 @@ new_JointCS <- Joint_CS %>%
   mutate(data = purrr::map(.x = data_filling, .f = function(.x){ data <- .x %>% 
     # mutate(mov = movavg(x = prec_R, n = 31, type = 't')) }))
     mutate(mov = movavg(x = prec_C, n = 31, type = 't')) }))
+
+
+
+testing <- Joint_CS %>%
+  right_join(., coef) %>% 
+  mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
+  dplyr::select(-data, -coef) %>% 
+  dplyr::select(-NA_percent) %>%
+  # filter(row_number() == 1) %>% 
+  unnest 
+
+
+testing %>% 
+  dplyr::select(station_N, prec, Chirps, julian, prec_R, prec_C) %>% 
+  gather(type, value, -station_N, -julian) %>% 
+  filter( type %in% c('prec', 'Chirps')) %>% 
+  ggplot(aes( x = julian, y = value, colour = type)) +
+  geom_line(alpha = 0.7) +
+  scale_color_viridis_d() +
+  facet_wrap(~station_N, nrow = 2) +
+  theme_bw()  +
+  theme(legend.position = 'top') + 
+  labs(x = 'Julian Day', y = 'Precipitation (mm)')
+
+
+
+testing %>% 
+  dplyr::select(station_N, prec, Chirps, julian, prec_R, prec_C) %>% 
+  # gather(type, value, -station_N, -julian) %>% 
+  # filter( type %in% c('prec_R', 'prec')) %>% 
+  mutate(Fill = ifelse(prec == prec_R, 'Original', 'Model')) %>% 
+  ggplot(aes( x = julian, y = prec_R, colour = Fill)) +
+  geom_line() +
+  scale_colour_manual(values = c("black", "gray")) + 
+  facet_wrap(~station_N, nrow = 2) +
+  theme_bw()  +
+  theme(legend.position = 'top') + 
+  labs(x = 'Julian Day', y = 'Precipitation (mm)')
 
 
 
