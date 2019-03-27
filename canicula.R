@@ -616,7 +616,89 @@ tictoc::toc() # 1.47 h
 
 
 
- 
+
+
+
+
+### Mean graphs And NA. 
+# 
+# Length <- MSD_data %>%
+#   dplyr::select(-data, -id)  %>%
+#   unnest %>%
+#   na_if(-999) %>%
+#   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
+#   group_by(id, x, y) %>%
+#   summarise_all(mean, na.rm = TRUE) %>%
+#   # gather(Indicator, value, -id, -x, -y) %>%
+#   ggplot(.) +
+#   geom_tile(aes(x, y, fill = Length)) +
+#   scale_fill_viridis(na.value="white",  direction = -1) +
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+#   theme_bw() +
+#   labs(x = 'Longitud', y = 'Latitud', fill = 'Días', title = 'a).')
+# 
+# 
+# Intensity <- MSD_data %>%
+#   dplyr::select(-data, -id)  %>%
+#   unnest %>%
+#   na_if(-999) %>%
+#   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
+#   group_by(id, x, y) %>%
+#   summarise_all(mean, na.rm = TRUE) %>%
+#   # gather(Indicator, value, -id, -x, -y) %>%
+#   ggplot(.) +
+#   geom_tile(aes(x, y, fill = Intensity)) +
+#   scale_fill_viridis(na.value="white",  direction = -1) +
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+#   theme_bw() +
+#   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'b).')
+
+# Magnitude <- MSD_data %>%
+#   dplyr::select(-data, -id)  %>%
+#   unnest %>%
+#   na_if(-999) %>%
+#   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
+#   group_by(id, x, y) %>%
+#   summarise_all(mean, na.rm = TRUE) %>%
+#   # gather(Indicator, value, -id, -x, -y) %>%
+#   ggplot(.) +
+#   geom_tile(aes(x, y, fill = Magnitude)) +
+#   scale_fill_viridis(na.value="white",  direction = -1) +
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+#   theme_bw() +
+#   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'c).')
+# 
+# 
+# 
+# gridExtra::grid.arrange(Length, Intensity, Magnitude, ncol = 3)
+
+
+
+
+
+# Mapa de % de NA. 
+
+MSD_data %>%
+    dplyr::select(-data, -id)  %>%
+    unnest %>%
+    na_if(-999) %>% 
+  dplyr::select(year, id, x, y, Start) %>% 
+  group_by(id, x, y) %>% 
+  summarise_all(funs(sum(is.na(.))/37 * 100)) %>% 
+  ggplot(.) +
+  geom_tile(aes(x, y, fill = Start)) +
+  scale_fill_viridis(na.value="white",  direction = -1) +
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+  theme_bw() +
+  labs(x = 'Longitud', y = 'Latitud', fill = '%NA', title = 'a).')
+
+
+
+
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-  
   
 # =-=-=-=-=-=-=-=
@@ -683,7 +765,7 @@ CPT_file <- function(data, var){
     rbind(Lat_Long, .) 
   
 
-  file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/', var, '.txt')
+  file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Chirps_', var, '.txt')
   
   
   sink(file = file)
@@ -906,13 +988,24 @@ return(Fill_data)}
 
 # =-=-=-=-=-=-=
 # Fix this part
+# new_JointCS <-  Joint_CS %>%
+#   right_join(., coef) %>% 
+#   mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
+#   dplyr::select(-data, -coef) %>% 
+#   mutate(data = purrr::map(.x = data_filling, .f = function(.x){ data <- .x %>% 
+#     mutate(mov = movavg(x = prec_C, n = 31, type = 't'), 
+#            mov_R = movavg(x = prec_R, n = 31, type = 't')) }))
+
+
+
 new_JointCS <-  Joint_CS %>%
   right_join(., coef) %>% 
   mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
   dplyr::select(-data, -coef) %>% 
   mutate(data = purrr::map(.x = data_filling, .f = function(.x){ data <- .x %>% 
-    mutate(mov = movavg(x = prec_C, n = 31, type = 't'), 
-           mov_R = movavg(x = prec_R, n = 31, type = 't')) }))
+    mutate(mov = movavg(x = prec_C, n = 40, type = 't'), 
+           mov_R = movavg(x = prec_R, n = 40, type = 't')) }))
+
 
 
 # =-=-=-=-=-
@@ -1226,4 +1319,82 @@ CPT_file_s <- function(data, var){
 CPT_file_s(data = proof, var = 'Intensity' )
 
 
-  
+
+
+### Mean graphs And NA. 
+# 
+
+# 
+# Length <- proof %>% 
+#   dplyr::select(year ,MSD) %>% 
+#   unnest %>% 
+#   na_if(-999) %>% 
+#   dplyr::select(-Min, -Start, -End, -End_P) %>% 
+#   group_by(id, x, y) %>%
+#   summarise_all(mean, na.rm = TRUE) %>%
+#   # gather(Indicator, value, -id, -x, -y) %>%
+#   ggplot(.) +
+#   geom_point(aes(x, y, colour = Length)) +
+#   scale_colour_viridis(na.value="white",  direction = -1) +
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+#   theme_bw() +
+#   labs(x = 'Longitud', y = 'Latitud', fill = 'Días', title = 'a).')
+#  
+# Intensity <- proof %>% 
+#   dplyr::select(year ,MSD) %>% 
+#   unnest %>% 
+#   na_if(-999) %>% 
+#   dplyr::select(-Min, -Start, -End, -End_P) %>%
+#   group_by(id, x, y) %>%
+#   summarise_all(mean, na.rm = TRUE) %>%
+#   # gather(Indicator, value, -id, -x, -y) %>%
+#   ggplot(.) +
+#   geom_point(aes(x, y, colour = Intensity)) +
+#   scale_colour_viridis(na.value="white",  direction = -1) +
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+#   theme_bw() +
+#   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'b).')
+# 
+# Magnitude <- proof %>%
+#   dplyr::select(year ,MSD) %>%
+#   unnest %>%
+#   na_if(-999) %>%
+#   dplyr::select(-Min, -Start, -End, -End_P) %>%
+#   group_by(id, x, y) %>%
+#   summarise_all(mean, na.rm = TRUE) %>%
+#   # gather(Indicator, value, -id, -x, -y) %>%
+#   ggplot(.) +
+#   geom_point(aes(x, y, colour = Magnitude)) +
+#   scale_colour_viridis(na.value="white",  direction = -1) +
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+#   theme_bw() +
+#   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'c).')
+#  
+# gridExtra::grid.arrange(Length, Intensity, Magnitude, ncol = 3)
+
+
+
+
+
+# Mapa de % de NA. 
+
+proof %>%
+  dplyr::select(year ,MSD) %>%
+  unnest %>%
+  na_if(-999) %>%
+  dplyr::select(year, id, x, y, Start) %>% 
+  group_by(id, x, y) %>% 
+  summarise_all(funs(sum(is.na(.))/36 * 100)) %>% 
+  ggplot(.) +
+  geom_point(aes(x, y, colour = Start)) +
+  scale_colour_viridis(na.value="white",  direction = -1) +
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+  theme_bw() +
+  labs(x = 'Longitud', y = 'Latitud', fill = '%NA', title = 'b).')
+
+
+
