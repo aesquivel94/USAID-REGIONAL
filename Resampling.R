@@ -355,6 +355,21 @@ resampling <-  function(data, CPT_prob, year_forecast){
     unnest %>% 
     arrange(year)
   
+  
+  
+  # data %>% 
+  #   mutate(date = mdy(glue::glue('{month}-{day}-{year}'))) %>% 
+  #   filter(year == '2010')  %>% 
+  #   ggplot(aes(date, precip)) + 
+  #   geom_line() + 
+  #   scale_x_date(date_labels = "%b-%d", breaks  = "1 month", 
+  #                limits = c(as.Date('2010-01-01'), as.Date('2010-12-31'))) +
+  #   labs(x = NULL, y = 'Precipitación (mm)') + 
+  #   theme_bw()
+  
+  
+  
+  
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
   # =-=-=-=-=  Do years (start year and end year)...
   
@@ -391,6 +406,19 @@ resampling <-  function(data, CPT_prob, year_forecast){
     mutate(month_data = purrr::map2(.x = Season, .y = xi, 
                                     .f = do_organize_data, data = data, 
                                     Intial_year = Intial_year, last_year = last_year))
+  
+  # jam <- Times %>% filter(row_number() == 1) %>% dplyr::select(-xi) %>% unnest %>% unnest 
+  # quantile(jam$precip, c(0.33, 0.66))
+
+  # jam %>% 
+  #   arrange(year) %>% 
+  #   ggplot(aes(year, precip)) +
+  #   geom_line() + 
+  #   scale_x_continuous(breaks = seq(1980,2013, 4), labels =  glue::glue('NDJ-{seq(1980,2013, 4)}') ) + 
+  #   theme_bw()  +
+  #   labs(x = NULL, y = 'Precipitación (mm)')  
+  
+  
   
   # This function do the 100 category samples.   
   Times <- Times %>%
@@ -760,6 +788,37 @@ for(k in 1:nrow(escenarios_final)){
   to.write = rbind.data.frame( data_obs_m,esc_final_diarios[[k]])
   write.csv(to.write,paste(path_output,"/",station,"/escenario_",nom[k],".csv",sep=""),row.names=F)
 }
+
+
+
+
+
+# =-=
+
+cl <- makeCluster(detectCores() - 2) # numero de nucleos proceso en paralelo
+
+substr_year <- substring(Sys.Date(),1,4)
+
+if (substring(Sys.Date(),6,7) == "01"){
+  substr_month <- "12"
+  substr_year <- as.numeric(substring(Sys.Date(),1,4))-1
+} else {
+  substr_month <- str_pad(as.numeric(substring(Sys.Date(),6,7))-1,2,pad = "0")
+  substr_year <- substring(Sys.Date(),1,4)
+}
+
+ini.date = paste0(substr_year,"-",substr_month,"-01")
+ini.date = as.Date(ini.date)
+
+end.date = paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date))
+end.date = as.Date(end.date)
+
+
+download_data_chirp(ini.date,end.date,year_to = substr_year,outDir = path_output,cl)
+
+
+
+
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
