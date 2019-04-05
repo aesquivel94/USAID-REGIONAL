@@ -24,6 +24,7 @@ library(cowsay)
 library(sf)
 library(skimr)
 library(gganimate)
+library(magick)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 
 
@@ -559,7 +560,6 @@ anim_save("MSD_Index/Magnitude_Chirps.gif", anim)
 
 
 # =-=-=-=-= Generación de los gif para las series de tiempo. 
-library(magick)
 # library(ggplot2)
 
 MSD_data1 <- MSD_data %>% 
@@ -988,23 +988,23 @@ return(Fill_data)}
 
 # =-=-=-=-=-=-=
 # Fix this part
+new_JointCS <-  Joint_CS %>%
+  right_join(., coef) %>%
+  mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
+  dplyr::select(-data, -coef) %>%
+  mutate(data = purrr::map(.x = data_filling, .f = function(.x){ data <- .x %>%
+    mutate(mov = movavg(x = prec_C, n = 31, type = 't'),
+           mov_R = movavg(x = prec_R, n = 31, type = 't')) }))
+
+
+
 # new_JointCS <-  Joint_CS %>%
 #   right_join(., coef) %>% 
 #   mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
 #   dplyr::select(-data, -coef) %>% 
 #   mutate(data = purrr::map(.x = data_filling, .f = function(.x){ data <- .x %>% 
-#     mutate(mov = movavg(x = prec_C, n = 31, type = 't'), 
-#            mov_R = movavg(x = prec_R, n = 31, type = 't')) }))
-
-
-
-new_JointCS <-  Joint_CS %>%
-  right_join(., coef) %>% 
-  mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
-  dplyr::select(-data, -coef) %>% 
-  mutate(data = purrr::map(.x = data_filling, .f = function(.x){ data <- .x %>% 
-    mutate(mov = movavg(x = prec_C, n = 40, type = 't'), 
-           mov_R = movavg(x = prec_R, n = 40, type = 't')) }))
+#     mutate(mov = movavg(x = prec_C, n = 40, type = 't'), 
+#            mov_R = movavg(x = prec_R, n = 40, type = 't')) }))
 
 
 
@@ -1397,4 +1397,194 @@ proof %>%
   labs(x = 'Longitud', y = 'Latitud', fill = '%NA', title = 'b).')
 
 
+
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# Proof a new metogology spliting data time serie.
+
+# .------..------..------..------..------.
+# |P.--. ||R.--. ||O.--. ||O.--. ||F.--. |
+# | :/\: || :(): || :/\: || :/\: || :(): |
+# | (__) || ()() || :\/: || :\/: || ()() |
+# | '--'P|| '--'R|| '--'O|| '--'O|| '--'F|
+# `------'`------'`------'`------'`------'
+
+
+
+
+new_JointCS <-  Joint_CS %>%
+  right_join(., coef) %>%
+  mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
+  dplyr::select(-data, -coef) %>%
+  mutate(data = purrr::map(.x = data_filling, .f = function(.x){ data <- .x %>%
+    mutate(mov = movavg(x = prec_C, n = 31, type = 't'),
+           mov_R = movavg(x = prec_R, n = 31, type = 't')) }))
+
+
+# Por ahora las pruebas 
+year_1982 <- new_JointCS %>% 
+  filter(row_number() == 1) %>% 
+  dplyr::select(station_N, Lon,  Lat, data) %>% 
+  unnest %>% 
+  filter(year == 1984) %>% 
+  rename(id = 'station_N' ) %>% 
+  dplyr::select(id, Lon, Lat, day, month, year, date, julian, mov)
+
+
+names(year_1982)
+
+
+# year_1982 %>% 
+#   ggplot() + 
+#   geom_line(aes(julian, mov)) +
+#   theme_bw() +
+#   labs(x = 'Día Juliano', y = "Promedio Triangular (mm)") 
+
+
+year_1982_f <- year_1982 %>% 
+  filter(between(month, 5, 9)) 
+
+
+
+
+
+julian <- year_1982_f %>% 
+  slice(1, n()) %>% 
+  .$julian
+
+dif <- (julian[2] + julian[1])/2
+
+
+
+
+
+#Dividir el periodo en 2 (porque si) ...
+
+
+row_1 <- year_1982_f %>% 
+  filter(julian <= dif) %>% 
+  arrange(desc(mov)) %>% 
+  slice(1)
+
+row_2 <- year_1982_f %>% 
+  filter(julian > dif) %>% 
+  arrange(desc(mov)) %>% 
+  slice(1)
+
+
+row_min <- year_1982_f %>% 
+  filter(between(julian,row_1$julian, row_2$julian )) %>% 
+  arrange(mov) %>% 
+  slice(1)
+  
+
+year_1982_f %>% 
+  ggplot() + 
+  geom_line(aes(julian, mov)) +
+  theme_bw() +
+  labs(x = 'Día Juliano', y = "Promedio Triangular (mm)")   + 
+  # geom_rect(aes(xmin= min(year_1982_f$julian), xmax=dif ,  ymin= 0, ymax= Inf),
+  #           alpha=0.2, fill="red") + 
+  annotate("rect", xmin= min(year_1982_f$julian), xmax=dif  ,  ymin= 0, ymax= Inf, fill="red", alpha = 0.1) +
+  annotate("rect", xmin= dif , xmax=  max(year_1982_f$julian),  ymin= 0, ymax= Inf, fill="blue", alpha = 0.1) +
+  geom_vline(xintercept = c(row_1$julian, row_2$julian, row_min$julian), colour = c('red', 'blue', 'yellow'))
+  
+
+  
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+dr <- read_csv("Drought/dr.csv")
+
+# Testing other methodologies
+year_pixel <-  filter(dr, year == 1989) %>% 
+  dplyr::select(station_N, Lon , Lat ,day, month , year, julian, prec_C)
+# mutate(mov =  movavg(x = prec_C, n = 31, type = 't'))
+
+
+
+rain <- HoltWinters(year_pixel$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1] 
+# rainseriesforecasts <- HoltWinters(rainfall, beta=FALSE, gamma=FALSE)
+
+ideas_try <- year_pixel %>%
+  mutate(mov =  movavg(x = prec_C, n = 31, type = 't'), ts = c(0,rain), 
+         mov_ts = movavg(x = ts, n = 31, type = 't')) %>% 
+  dplyr::select(-prec_C)
+
+
+
+ideas_try %>% 
+  filter(between(month, 5, 9)) %>%
+  slice(1, n()) %>% 
+  pull(julian)
+
+
+
+ideas_try %>% 
+  gather(key = var, value = value, -station_N, 
+         -Lon ,-Lat , -day, -month, -year, -julian) %>% 
+  ggplot(aes(x = julian, y = value, colour = var)) +
+  geom_line() + 
+  geom_vline(xintercept = c(121, 273),  color="blue", linetype="dashed", size=1)+
+  facet_wrap(~var, ncol = 3) +
+  labs(x = NULL, Y = 'Precipitation (mm)')+
+  theme_bw() + 
+  theme(legend.position = 'top')  
+
+
+
+may_sep <- ideas_try %>% 
+  filter(between(month, 5, 9)) %>% 
+  mutate(Local_Tts = case_when(
+    lag(mov_ts) > mov_ts & lead(mov_ts) > mov_ts ~ 1, 
+    lead(mov_ts) < mov_ts & lag(mov_ts) < mov_ts ~ 2,
+    TRUE ~ 0  ) ) 
+
+max <-  may_sep %>% 
+  filter(Local_Tts == 1) %>% 
+  pull(julian)
+
+
+min <- may_sep %>% 
+  filter(Local_Tts == 2) %>% 
+  pull(julian)
+
+may_sep %>% 
+  ggplot(aes(x = julian, y = mov_ts)) + 
+  geom_line() + 
+  geom_vline(xintercept = min, color = 'blue', linetype="dashed", size=1) + 
+  geom_vline(xintercept = max, color = 'red', linetype="dashed", size=1) +
+  theme_bw()
+
+
+
+
+
+
+
+## 
+library(zoo)
+x.Date <- as.Date(paste(2004, rep(1:4, 4:1), sample(1:28, 10), sep = "-"))
+x <- zoo(rnorm(12), x.Date)
+
+rollmean(x, 3)
+rollmax(x, 3)
+rollmedian(x, 3)
+
+xm <- zoo(matrix(1:12, 4, 3), x.Date[1:4])
+rollmean(xm, 3)
+rollmax(x, 1) %>% length()
+rollmedian(xm, 3)
+
+rapply(xm, 3, mean) # uses rollmean
+rapply(xm, 3, function(x) mean(x)) # does not use rollmean
 
