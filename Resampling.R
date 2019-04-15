@@ -1,7 +1,7 @@
 rm(list = ls()); gc(reset = TRUE)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Made by:     Alejandra Esquivel Arias. 
-# Created in:  Date: 3-2019.
+# Created in:  Date: 4-2019.
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Resampling Methodology 
 
@@ -447,75 +447,101 @@ resampling <-  function(data, CPT_prob, year_forecast){
   
   
   # =-=-=-=-=-=-=-=
-  library(trend)
+  # library(trend)
   
   
   # do_trend <- function(Daily_filter){
   #   
-  #   Tmax <- dplyr::select(Daily_filter, tmax)
-  #   Tmx <- ts(data = Tmax, start = min(Tmax), end = max(Tmax))
-  #   sen_Tmax <- sens.slope(Tmx)
-  #   # t <- 1:length(Tmx)
   #   
-  #   sen_Tmax$estimates * 1:length(Tmx)
+  # 
+  #   # Ajam, lo primero necesito esa serie para cada trimestre.... (donde la cree?)
+  #   #  Inicialmente esto se extrae con ayuda de partes de la funcion day_sample
+  #   # Supongamos por ahora noviembre
+  #   Daily_filter <- data %>%
+  #     filter(month %in% c(11,12,1)) %>%
+  #     mutate(year_M = ifelse(month == 1, year, year+1)) %>%
+  #     filter(year_M >= (Intial_year + 1), year_M < (last_year + 1))%>%
+  #     mutate(year = year_M - 1) %>%
+  #     dplyr::select(-year_M)
   #   
-  #   Tmin <- dplyr::select(Daily_filter, tmin) %>% data_frame() %>% as.vector()
-  #   Tmn <- ts(data = Tmin, start = min(Tmin), end = max(Tmin))
-  #   # sen_Tmin <- sens.slope(Tmin)
-  #   # length(Tmn)
+  #   
+  # 
+  #   
+  #   # Desde aquí estoy adaptando el codigo como creo que es...
+  #   
+  #   Tmax <- dplyr::select(Daily_filter, year,tmax) %>% 
+  #           group_by(year) %>% 
+  #           summarise(Tmax = mean(tmax))
+  #   
+  #   Tmx <- ts(data = Tmax, frequency = 1)
+  #   sen_Tmax <- trend::sens.slope(Tmx)
+  # 
+  #   s_p_tmax <- ifelse(between(0, sen_Tmax$conf.int[1], sen_Tmax$conf.int[2])== FALSE, 
+  #                      sen_Tmax$estimates, 0)
+  #   
+  #   trend_max <- s_p_tmax *(1:dim(Tmax)[1])
+  #   
+  #   #####
+  #   
+  #   data_d_trend = data_d[data_d$month %in% probabilidades$month,]
+  # 
+  #     trend_max = trend_by_year_max[which(row.names(trend_by_year_max)==y),month.name[m]]
+  #     pos_max = which(data_d_trend$year==y & data_d_trend$month==m)
+  #     data_d_trend$t_max[pos_max] = data_d_trend$t_max[pos_max]+trend_max
+  # #####    
   # }
-  
+  # 
   
   # =-=-=-=-=-=-=-=
   
   # day_sample <- function(Season, cat, data, Intial_year, last_year){
-  #   # data it's station data.  
+  #   # data it's station data.
   #   # cat <-  Times %>%  dplyr::select(cat) %>% filter(row_number() < 2) %>% unnest
-  #   # Season <- 'NDJ'
-  #   
-  #   month_ini <- cat %>% 
-  #     dplyr::select(start_month) %>% 
-  #     unique() %>% 
+  #   Season <- 'NDJ'
+  # 
+  #   month_ini <- cat %>%
+  #     dplyr::select(start_month) %>%
+  #     unique() %>%
   #     as.numeric()
-  #   
-  #   month_end <- cat %>% 
-  #     dplyr::select(end_month) %>% 
-  #     unique() %>% 
+  # 
+  #   month_end <- cat %>%
+  #     dplyr::select(end_month) %>%
+  #     unique() %>%
   #     as.numeric()
-  #   
+  # 
   #   # Filter by season data serie.
   #   if(Season == 'NDJ'){
-  #     Daily_filter <- data %>%
-  #       filter(month %in% c(11,12,1)) %>% 
-  #       mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
-  #       filter(year_M >= (Intial_year + 1), year_M < (last_year + 1))%>%
-  #       mutate(year = year_M - 1) %>% 
-  #       dplyr::select(-year_M)
-  #     
+      # Daily_filter <- data %>%
+      #   filter(month %in% c(11,12,1)) %>%
+      #   mutate(year_M = ifelse(month == 1, year, year+1)) %>%
+      #   filter(year_M >= (Intial_year + 1), year_M < (last_year + 1))%>%
+      #   mutate(year = year_M - 1) %>%
+      #   dplyr::select(-year_M)
+  # 
   #   } else if(Season == 'DJF'){
   #     Daily_filter <- data %>%
-  #       filter(month %in% c(11,12,1)) %>% 
-  #       mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
+  #       filter(month %in% c(11,12,1)) %>%
+  #       mutate(year_M = ifelse(month == 1, year, year+1)) %>%
   #       filter(year_M >= (Intial_year + 1), year_M < (last_year +1 ))%>%
-  #       mutate(year = year_M - 1) %>% 
+  #       mutate(year = year_M - 1) %>%
   #       dplyr::select(-year_M)
-  #     
+  # 
   #   } else{
   #     Daily_filter <-  data %>%
-  #       filter(between(month, month_ini, month_end)) 
+  #       filter(between(month, month_ini, month_end))
   #   }
-  #   
-  #   
+  # 
+  # 
   #   # Aqui hay que agregar la parte la función do_trend...
   #   Daily_filter
-  #   
   # 
-  #     Daily_data <- cat %>% 
-  #     dplyr::select(-start_month, -end_month) %>% 
+  # 
+  #     Daily_data <- cat %>%
+  #     dplyr::select(-start_month, -end_month) %>%
   #     mutate(daily_data = purrr::map(.x = year, .f = function(.x){
-  #       Daily_filter %>% filter(year == .x)})) %>% 
+  #       Daily_filter %>% filter(year == .x)})) %>%
   #     dplyr::select(-year)
-  #   
+  # 
   # }
   
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
