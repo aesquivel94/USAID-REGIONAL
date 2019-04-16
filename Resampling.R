@@ -527,13 +527,11 @@ Prob <- readr::read_csv("Resampling/CPT_prob/Cerete1_prob_precip.csv")
 year_forecast <- Sys.Date() %>% year()
 
 
-
-
 # Read daily data:
 Path_stations <- 'Resampling/daily_preliminar'
 Path_Prob <- 'Resampling/CPT_prob'
 
-# =-=-=-=-=-=-=-=-=
+# =-=-=-=-=-=-=-=-= Reading all data sets. 
 Initial_data <- tibble(names = list.files(Path_stations) %>% str_remove('.csv'), 
        path_stations = Path_stations %>% list.files(full.names = TRUE), 
        CPT_path = Path_Prob %>% list.files(full.names = TRUE)) %>% 
@@ -551,8 +549,7 @@ Initial_data <- Initial_data %>%
   return(Prov)})) 
 
 
-# =-=-=-=-=-=-=-=
-
+# =-=-=-=-=-=-=-= we are doing resampling for all data sets 
 tictoc::tic()
 Resam <- Initial_data %>% 
   mutate(Escenaries = purrr::map2(.x = stations, .y = CPT_prob, 
@@ -590,51 +587,52 @@ month_to <- Sys.Date() %>% month()
 # data_d <- Cerete
 
 # Por ahora no voy a modificar mucho esta parte... 
-download_data_nasa <- function(lat,lon,year_to,month_to,data_d){
-  # url_all = paste0("https://power.larc.nasa.gov/cgi-bin/agro.cgi?email=&area=area&latmin=",lat,"&lonmin=",lon,"&latmax=",lat,"&lonmax=",lon,"&ms=1&ds=1&ys=1983&me=12&de=31&ye=",year_to,"&p=swv_dwn&p=T2MN&p=T2MX&submit=Submit")
-  # url_all = paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
-  # 
-  # data_nasa = read.table(url_all,skip = 15,header = F, na.strings = "-")
-  json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
-  # Esta mostrando un error que no conozco. 
-  json_data <- jsonlite::fromJSON(json_file)
-
-  srad <- json_data$features$properties$parameter$ALLSKY_SFC_SW_DWN %>% unlist
-  tmax <- json_data$features$properties$parameter$T2M_MAX %>% unlist
-  tmin <- json_data$features$properties$parameter$T2M_MIN %>% unlist
-  
-  
-  
-  data_nasa <-data.frame(srad,tmin,tmax)
-  data_nasa[ data_nasa == -99 ] <- NA
-  
-  names(data_nasa) <- c("sol_rad","t_min","t_max")
-  dates <- seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")
-  month <- as.numeric(format(dates,"%m"))
-  year_n <- as.numeric(format(dates,"%Y"))
-  
-  #data_d = read.csv("D:/_Scripts/usaid_forecast/_package/prediccionClimatica/dailyData/58504f1a006cb93ed40eebe3.csv",header=T,dec=".")
-  sel_obs <- data_d[data_d$year %in% unique(year_n),]
-  sel_nasa <- data_nasa[year_n %in% unique(data_d$year),]
-  
-  
-  # Aqui voy a probar los nombres de las variables... sera que por si acaso 
-  # debo dejar el codigo original comentado. 
-  
-  ses_tmax <- mean(sel_obs$tmax-sel_nasa$t_max,na.rm=T) 
-  ses_tmin <- mean(sel_obs$tmin-sel_nasa$t_min,na.rm=T)
-  ses_srad <- mean(sel_obs$srad-sel_nasa$sol_rad,na.rm=T)
-  
-  data_sel_m <- data_nasa[year_n == year_to & month == month_to,]
-  data_sel_m$sol_rad <- data_sel_m$sol_rad+ses_srad
-  data_sel_m$t_min <- data_sel_m$t_min+ses_tmin
-  data_sel_m$t_max <- data_sel_m$t_max+ses_tmax
-  
-  data_sel_m$sol_rad[is.na(data_sel_m$sol_rad)] <- mean(data_sel_m$sol_rad,na.rm=T)
-  data_sel_m$t_max[is.na(data_sel_m$t_max)] <- mean(data_sel_m$t_max,na.rm=T)
-  data_sel_m$t_min[is.na(data_sel_m$t_min)] <- mean(data_sel_m$t_min,na.rm=T)
-  
-  return(data_sel_m)}
+# En este momento el api de descarga de NASA no esta funcionando... por eso se comentó esta parte. 
+# download_data_nasa <- function(lat,lon,year_to,month_to,data_d){
+#   # url_all = paste0("https://power.larc.nasa.gov/cgi-bin/agro.cgi?email=&area=area&latmin=",lat,"&lonmin=",lon,"&latmax=",lat,"&lonmax=",lon,"&ms=1&ds=1&ys=1983&me=12&de=31&ye=",year_to,"&p=swv_dwn&p=T2MN&p=T2MX&submit=Submit")
+#   # url_all = paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
+#   # 
+#   # data_nasa = read.table(url_all,skip = 15,header = F, na.strings = "-")
+#   json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
+#   # Esta mostrando un error que no conozco. 
+#   json_data <- jsonlite::fromJSON(json_file)
+# 
+#   srad <- json_data$features$properties$parameter$ALLSKY_SFC_SW_DWN %>% unlist
+#   tmax <- json_data$features$properties$parameter$T2M_MAX %>% unlist
+#   tmin <- json_data$features$properties$parameter$T2M_MIN %>% unlist
+#   
+#   
+#   
+#   data_nasa <-data.frame(srad,tmin,tmax)
+#   data_nasa[ data_nasa == -99 ] <- NA
+#   
+#   names(data_nasa) <- c("sol_rad","t_min","t_max")
+#   dates <- seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")
+#   month <- as.numeric(format(dates,"%m"))
+#   year_n <- as.numeric(format(dates,"%Y"))
+#   
+#   #data_d = read.csv("D:/_Scripts/usaid_forecast/_package/prediccionClimatica/dailyData/58504f1a006cb93ed40eebe3.csv",header=T,dec=".")
+#   sel_obs <- data_d[data_d$year %in% unique(year_n),]
+#   sel_nasa <- data_nasa[year_n %in% unique(data_d$year),]
+#   
+#   
+#   # Aqui voy a probar los nombres de las variables... sera que por si acaso 
+#   # debo dejar el codigo original comentado. 
+#   
+#   ses_tmax <- mean(sel_obs$tmax-sel_nasa$t_max,na.rm=T) 
+#   ses_tmin <- mean(sel_obs$tmin-sel_nasa$t_min,na.rm=T)
+#   ses_srad <- mean(sel_obs$srad-sel_nasa$sol_rad,na.rm=T)
+#   
+#   data_sel_m <- data_nasa[year_n == year_to & month == month_to,]
+#   data_sel_m$sol_rad <- data_sel_m$sol_rad+ses_srad
+#   data_sel_m$t_min <- data_sel_m$t_min+ses_tmin
+#   data_sel_m$t_max <- data_sel_m$t_max+ses_tmax
+#   
+#   data_sel_m$sol_rad[is.na(data_sel_m$sol_rad)] <- mean(data_sel_m$sol_rad,na.rm=T)
+#   data_sel_m$t_max[is.na(data_sel_m$t_max)] <- mean(data_sel_m$t_max,na.rm=T)
+#   data_sel_m$t_min[is.na(data_sel_m$t_min)] <- mean(data_sel_m$t_min,na.rm=T)
+#   
+#   return(data_sel_m)}
 
 
 
@@ -642,33 +640,50 @@ download_data_nasa <- function(lat,lon,year_to,month_to,data_d){
 #---------------------------------------------------------------------------------#
 #-------------- Function to extract Chirp daily data. ----------------------------#
 #---------------------------------------------------------------------------------#
-# INPUT
-# lat: latitud de la estaciÃ³n/sitio de interÃ©s
-# lon: longitud de la estaciÃ³n/sitio de interÃ©s
-# ini.date: fecha inicio de descarga
-# end.date: fecha final de descarga
-# outDir: Directorio donde se guardarÃ¡n las imagenes de chirps
-# OUTPUT
-# Datos diarios de precipitaciÃ³n de CHIRP
 
-# ini.date <- 
-# end.date <- 
-# outDir <- 
-# cl <- 
+
+# Por ahora no modificar. 
+numberOfDays <- function(date) {
+  m <- format(date, format="%m")
   
-download_data_chirp = function(ini.date,end.date,year_to,outDir,cl){
+  while (format(date, format="%m") == m) {
+    date <- date + 1
+  }
   
-  z=seq(as.Date(ini.date), as.Date(end.date), "days")
-  fechas=str_replace_all(z, "-", ".")  
+  return(as.integer(format(date - 1, format="%d")))
+}
+
+
+# Creo que esto es para arreglar diciembre...
+if (substring(Sys.Date(),6,7) == "01"){
+  substr_month <- "12"
+  substr_year <- year(Sys.Date()) - 1
+} else {
+  substr_month <- str_pad(as.numeric(substring(Sys.Date(),6,7))-1,2,pad = "0")
+  substr_year <- year(Sys.Date())
+}
+
+
+
+ini.date <- paste0(substr_year,"-",substr_month,"-01") %>%  as.Date()
+# .... 
+end.date <- paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date)) %>% as.Date()
+
+outDir <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/Chirps'
+  
+download_data_chirp = function(ini.date, end.date, year_to, outDir){
+  
+  fechas <- seq(as.Date(ini.date), as.Date(end.date), "days") %>% str_replace_all("-", ".")  
   
   urls <- paste("ftp://ftp.chg.ucsb.edu/pub/org/chg/products/CHIRP/daily/",year_to,"/chirp.",fechas,".tif",sep="")
   file <- basename(urls)
-  outDir_all = paste0(outDir,"/",file)
+  outDir_all <- paste0(outDir,"/",file)
   
   
-  clusterMap(cl, download.file, url = urls, destfile = outDir_all, mode = "wb", 
-             .scheduling = 'dynamic')
-  
+  tictoc::tic()
+  download.file(url = urls[1], destfile = outDir_all[1])
+  tictoc::toc() # 84.12 seg.
+
   return("Datos de CHIRPS descargados!")
 }
 
