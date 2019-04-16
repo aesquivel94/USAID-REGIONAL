@@ -443,111 +443,10 @@ resampling <-  function(data, CPT_prob, year_forecast){
     set_names(paste0(letters[1:2], '.',  Times$Season)) %>% 
     bind_cols(id = 1:100, .)
   
-  
-  
-  
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
   # =-=-=-=-=-=-=-=
   # library(trend)
-  
-  
-  # do_trend <- function(Daily_filter){
-  #   
-  #   
-  # 
-  #   # Ajam, lo primero necesito esa serie para cada trimestre.... (donde la cree?)
-  #   #  Inicialmente esto se extrae con ayuda de partes de la funcion day_sample
-  #   # Supongamos por ahora noviembre
-  #   Daily_filter <- data %>%
-  #     filter(month %in% c(11,12,1)) %>%
-  #     mutate(year_M = ifelse(month == 1, year, year+1)) %>%
-  #     filter(year_M >= (Intial_year + 1), year_M < (last_year + 1))%>%
-  #     mutate(year = year_M - 1) %>%
-  #     dplyr::select(-year_M)
-  #   
-  #   
-  # 
-  #   
-  #   # Desde aquí estoy adaptando el codigo como creo que es...
-  #   
-  #   Tmax <- dplyr::select(Daily_filter, year,tmax) %>% 
-  #           group_by(year) %>% 
-  #           summarise(Tmax = mean(tmax))
-  #   
-  #   Tmx <- ts(data = Tmax, frequency = 1)
-  #   sen_Tmax <- trend::sens.slope(Tmx)
-  # 
-  #   s_p_tmax <- ifelse(between(0, sen_Tmax$conf.int[1], sen_Tmax$conf.int[2])== FALSE, 
-  #                      sen_Tmax$estimates, 0)
-  #   
-  #   trend_max <- s_p_tmax *(1:dim(Tmax)[1])
-  #   
-  #   #####
-  #   
-  #   data_d_trend = data_d[data_d$month %in% probabilidades$month,]
-  # 
-  #     trend_max = trend_by_year_max[which(row.names(trend_by_year_max)==y),month.name[m]]
-  #     pos_max = which(data_d_trend$year==y & data_d_trend$month==m)
-  #     data_d_trend$t_max[pos_max] = data_d_trend$t_max[pos_max]+trend_max
-  # #####    
-  # }
-  # 
-  
-  # =-=-=-=-=-=-=-=
-  
-  # day_sample <- function(Season, cat, data, Intial_year, last_year){
-  #   # data it's station data.
-  #   # cat <-  Times %>%  dplyr::select(cat) %>% filter(row_number() < 2) %>% unnest
-  #   Season <- 'NDJ'
-  # 
-  #   month_ini <- cat %>%
-  #     dplyr::select(start_month) %>%
-  #     unique() %>%
-  #     as.numeric()
-  # 
-  #   month_end <- cat %>%
-  #     dplyr::select(end_month) %>%
-  #     unique() %>%
-  #     as.numeric()
-  # 
-  #   # Filter by season data serie.
-  #   if(Season == 'NDJ'){
-      # Daily_filter <- data %>%
-      #   filter(month %in% c(11,12,1)) %>%
-      #   mutate(year_M = ifelse(month == 1, year, year+1)) %>%
-      #   filter(year_M >= (Intial_year + 1), year_M < (last_year + 1))%>%
-      #   mutate(year = year_M - 1) %>%
-      #   dplyr::select(-year_M)
-  # 
-  #   } else if(Season == 'DJF'){
-  #     Daily_filter <- data %>%
-  #       filter(month %in% c(11,12,1)) %>%
-  #       mutate(year_M = ifelse(month == 1, year, year+1)) %>%
-  #       filter(year_M >= (Intial_year + 1), year_M < (last_year +1 ))%>%
-  #       mutate(year = year_M - 1) %>%
-  #       dplyr::select(-year_M)
-  # 
-  #   } else{
-  #     Daily_filter <-  data %>%
-  #       filter(between(month, month_ini, month_end))
-  #   }
-  # 
-  # 
-  #   # Aqui hay que agregar la parte la función do_trend...
-  #   Daily_filter
-  # 
-  # 
-  #     Daily_data <- cat %>%
-  #     dplyr::select(-start_month, -end_month) %>%
-  #     mutate(daily_data = purrr::map(.x = year, .f = function(.x){
-  #       Daily_filter %>% filter(year == .x)})) %>%
-  #     dplyr::select(-year)
-  # 
-  # }
-  
-  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  
-  
-  
+ 
   
   # This function extract daily data using sample year.  
   daily_data <- Times %>% 
@@ -607,6 +506,13 @@ resampling <-  function(data, CPT_prob, year_forecast){
 
 
 
+# .------..------..------..------..------..------..------.
+# |R.--. ||E.--. ||S.--. ||U.--. ||L.--. ||T.--. ||S.--. |
+# | :(): || (\/) || :/\: || (\/) || :/\: || :/\: || :/\: |
+# | ()() || :\/: || :\/: || :\/: || (__) || (__) || :\/: |
+# | '--'R|| '--'E|| '--'S|| '--'U|| '--'L|| '--'T|| '--'S|
+# `------'`------'`------'`------'`------'`------'`------'
+
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -651,7 +557,7 @@ tictoc::tic()
 Resam <- Initial_data %>% 
   mutate(Escenaries = purrr::map2(.x = stations, .y = CPT_prob, 
                                   .f = resampling, year_forecast = year_forecast))
-tictoc::toc() # 28.82 -- less than one minute.
+tictoc::toc() # 16.55 -- less than one minute.
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -690,7 +596,8 @@ download_data_nasa <- function(lat,lon,year_to,month_to,data_d){
   # 
   # data_nasa = read.table(url_all,skip = 15,header = F, na.strings = "-")
   json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
-  json_data <- fromJSON(json_file)
+  # Esta mostrando un error que no conozco. 
+  json_data <- jsonlite::fromJSON(json_file)
 
   srad <- json_data$features$properties$parameter$ALLSKY_SFC_SW_DWN %>% unlist
   tmax <- json_data$features$properties$parameter$T2M_MAX %>% unlist
