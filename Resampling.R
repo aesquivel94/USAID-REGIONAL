@@ -641,6 +641,12 @@ download_data_nasa <- function(data, special_data){
 # nasa_data <- download_data_nasa(Cerete, special_data)
 # tictoc::toc()
 
+
+#### Fix from this part.
+# I guess it's necesary do 2 functions more, because we need do all month...
+# extract chirps for that points and join with NASA data
+# and put this before the resampling. 
+
 #---------------------------------------------------------------------------------#
 #-------------- Function to extract Chirp daily data. ----------------------------#
 #---------------------------------------------------------------------------------#
@@ -652,7 +658,7 @@ numberOfDays <- function(date) {
   
   while (format(date, format="%m") == m) {
     date <- date + 1
-  }
+}
   
   return(as.integer(format(date - 1, format="%d")))
 }
@@ -667,11 +673,11 @@ if (substring(Sys.Date(),6,7) == "01"){
   substr_year <- year(Sys.Date())
 }
 
-
-
 ini.date <- paste0(substr_year,"-",substr_month,"-01") %>%  as.Date()
 # .... 
 end.date <- paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date)) %>% as.Date()
+
+
 
 outDir <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/Chirps'
   
@@ -683,9 +689,9 @@ download_data_chirp = function(ini.date, end.date, year_to, outDir){
   file <- basename(urls)
   outDir_all <- paste0(outDir,"/",file)
   
-  
   tictoc::tic()
-  download.file(url = urls[1], destfile = outDir_all[1])
+  # download.file(url = urls, destfile = outDir_all)
+  purrr::map2(.x = urls, .y = outDir_all, .f = download.file)
   tictoc::toc() # 84.12 seg.
 
   return("Datos de CHIRPS descargados!")
@@ -693,7 +699,7 @@ download_data_chirp = function(ini.date, end.date, year_to, outDir){
 
 
 
-
+###### 
 
 
 
