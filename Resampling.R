@@ -586,56 +586,60 @@ month_to <- Sys.Date() %>% month()
 # Testing this parth 
 # data_d <- Cerete
 
-# Por ahora no voy a modificar mucho esta parte... 
-# En este momento el api de descarga de NASA no esta funcionando... por eso se comentó esta parte. 
-download_data_nasa <- function(lat,lon,year_to,month_to,data_d){
+
+# It could be possible NASA API in some case some times don't work.
+download_data_nasa <- function(data, special_data){
+  # data <- Cerete
+  # special_data <- tibble(lat, lon, year_to, month_to)
+  
+  lat <- special_data$lat
+  lon <- special_data$lon
+  year_to <- special_data$year_to
+  month_to <- special_data$month_to
+  
+  # do NASA path. 
   json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
-  # Esta mostrando un error que no conozco.
+  # download json. 
   json_data <- jsonlite::fromJSON(json_file)
   
-  
+  # Do NASA data set. 
   data_nasa <-  tibble(dates = seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")) %>%  
-    mutate(year_n = year(dates), month = month(dates), 
+    mutate(year_n = year(dates), month = month(dates), day = day(dates),
            tmin = json_data$features$properties$parameter$T2M_MIN %>% unlist, 
            tmax = json_data$features$properties$parameter$T2M_MAX %>% unlist, 
            srad = json_data$features$properties$parameter$ALLSKY_SFC_SW_DWN %>% unlist) %>% 
     na_if(-99)
  
+
+  # Join observed and NASA data. 
+  all_data <- right_join( data %>% 
+                filter(year %in% unique(data_nasa$year_n) ) %>% dplyr::select(-precip),
+              data_nasa %>% 
+                filter(year_n %in% unique(data$year)) %>% 
+                set_names('dates', 'year', 'month', 'day', 'tmin_N', 'tmax_N', 'srad_N'))
   
-  # =-=-=-=-=-=-=-=-=
-  Cerete %>% 
-    filter(year %in% unique(data_nasa$year_n) )
   
+  # Bias between observed data and NASA data. 
+  mean_less <- all_data %>% 
+    summarise(mean_max = mean(tmax-tmax_N, na.rm = TRUE), 
+              mean_min = mean(tmin - tmin_N, na.rm = TRUE),
+              mean_srad = mean(srad - srad_N, na.rm = TRUE))
   
-  data_nasa %>% 
-    filter(year_n %in% unique(Cerete$year)  )
+  # data full with mean NASA. 
+  nasa_data_dw <- data_nasa %>% 
+    filter(year_n == year_to, month == month_to) %>% 
+    mutate(tmax = tmax + pull(mean_less, mean_max), 
+           tmin = tmin + pull(mean_less, mean_min),
+           srad = srad + pull(mean_less, mean_srad)) %>% 
+    mutate(tmax = ifelse(is.na(tmax), mean(tmax, na.rm = TRUE), tmax),
+           tmin = ifelse(is.na(tmin), mean(tmin, na.rm = TRUE), tmin),
+           srad = ifelse(is.na(srad), mean(srad, na.rm = TRUE), srad))
   
-  
-  #data_d = read.csv("D:/_Scripts/usaid_forecast/_package/prediccionClimatica/dailyData/58504f1a006cb93ed40eebe3.csv",header=T,dec=".")
-  sel_obs <- data_d[data_d$year %in% unique(year_n),]
-  sel_nasa <- data_nasa[year_n %in% unique(data_d$year),]
+  return(nasa_data_dw)}
 
-
-  # Aqui voy a probar los nombres de las variables... sera que por si acaso
-  # debo dejar el codigo original comentado.
-
-  ses_tmax <- mean(sel_obs$tmax-sel_nasa$t_max,na.rm=T)
-  ses_tmin <- mean(sel_obs$tmin-sel_nasa$t_min,na.rm=T)
-  ses_srad <- mean(sel_obs$srad-sel_nasa$sol_rad,na.rm=T)
-
-  data_sel_m <- data_nasa[year_n == year_to & month == month_to,]
-  data_sel_m$sol_rad <- data_sel_m$sol_rad+ses_srad
-  data_sel_m$t_min <- data_sel_m$t_min+ses_tmin
-  data_sel_m$t_max <- data_sel_m$t_max+ses_tmax
-
-  data_sel_m$sol_rad[is.na(data_sel_m$sol_rad)] <- mean(data_sel_m$sol_rad,na.rm=T)
-  data_sel_m$t_max[is.na(data_sel_m$t_max)] <- mean(data_sel_m$t_max,na.rm=T)
-  data_sel_m$t_min[is.na(data_sel_m$t_min)] <- mean(data_sel_m$t_min,na.rm=T)
-
-  return(data_sel_m)}
-
-
-
+# tictoc::tic()
+# nasa_data <- download_data_nasa(Cerete, special_data)
+# tictoc::toc()
 
 #---------------------------------------------------------------------------------#
 #-------------- Function to extract Chirp daily data. ----------------------------#
