@@ -274,7 +274,7 @@ Find_Summary <- function(daily_by_season){
   # se extrae el minimo y maximo de la precipitacion. 
   Min_Max <-  monthly %>% 
     arrange(monthly) %>% 
-    slice(1,n()) %>% 
+    slice(c(1,n())) %>% 
     mutate(Type = c('min', 'max')) %>% 
     dplyr::select(-monthly)
   
@@ -588,51 +588,51 @@ month_to <- Sys.Date() %>% month()
 
 # Por ahora no voy a modificar mucho esta parte... 
 # En este momento el api de descarga de NASA no esta funcionando... por eso se comentó esta parte. 
-# download_data_nasa <- function(lat,lon,year_to,month_to,data_d){
-#   # url_all = paste0("https://power.larc.nasa.gov/cgi-bin/agro.cgi?email=&area=area&latmin=",lat,"&lonmin=",lon,"&latmax=",lat,"&lonmax=",lon,"&ms=1&ds=1&ys=1983&me=12&de=31&ye=",year_to,"&p=swv_dwn&p=T2MN&p=T2MX&submit=Submit")
-#   # url_all = paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
-#   # 
-#   # data_nasa = read.table(url_all,skip = 15,header = F, na.strings = "-")
-#   json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
-#   # Esta mostrando un error que no conozco. 
-#   json_data <- jsonlite::fromJSON(json_file)
-# 
-#   srad <- json_data$features$properties$parameter$ALLSKY_SFC_SW_DWN %>% unlist
-#   tmax <- json_data$features$properties$parameter$T2M_MAX %>% unlist
-#   tmin <- json_data$features$properties$parameter$T2M_MIN %>% unlist
-#   
-#   
-#   
-#   data_nasa <-data.frame(srad,tmin,tmax)
-#   data_nasa[ data_nasa == -99 ] <- NA
-#   
-#   names(data_nasa) <- c("sol_rad","t_min","t_max")
-#   dates <- seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")
-#   month <- as.numeric(format(dates,"%m"))
-#   year_n <- as.numeric(format(dates,"%Y"))
-#   
-#   #data_d = read.csv("D:/_Scripts/usaid_forecast/_package/prediccionClimatica/dailyData/58504f1a006cb93ed40eebe3.csv",header=T,dec=".")
-#   sel_obs <- data_d[data_d$year %in% unique(year_n),]
-#   sel_nasa <- data_nasa[year_n %in% unique(data_d$year),]
-#   
-#   
-#   # Aqui voy a probar los nombres de las variables... sera que por si acaso 
-#   # debo dejar el codigo original comentado. 
-#   
-#   ses_tmax <- mean(sel_obs$tmax-sel_nasa$t_max,na.rm=T) 
-#   ses_tmin <- mean(sel_obs$tmin-sel_nasa$t_min,na.rm=T)
-#   ses_srad <- mean(sel_obs$srad-sel_nasa$sol_rad,na.rm=T)
-#   
-#   data_sel_m <- data_nasa[year_n == year_to & month == month_to,]
-#   data_sel_m$sol_rad <- data_sel_m$sol_rad+ses_srad
-#   data_sel_m$t_min <- data_sel_m$t_min+ses_tmin
-#   data_sel_m$t_max <- data_sel_m$t_max+ses_tmax
-#   
-#   data_sel_m$sol_rad[is.na(data_sel_m$sol_rad)] <- mean(data_sel_m$sol_rad,na.rm=T)
-#   data_sel_m$t_max[is.na(data_sel_m$t_max)] <- mean(data_sel_m$t_max,na.rm=T)
-#   data_sel_m$t_min[is.na(data_sel_m$t_min)] <- mean(data_sel_m$t_min,na.rm=T)
-#   
-#   return(data_sel_m)}
+download_data_nasa <- function(lat,lon,year_to,month_to,data_d){
+  json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
+  # Esta mostrando un error que no conozco.
+  json_data <- jsonlite::fromJSON(json_file)
+  
+  
+  data_nasa <-  tibble(dates = seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")) %>%  
+    mutate(year_n = year(dates), month = month(dates), 
+           tmin = json_data$features$properties$parameter$T2M_MIN %>% unlist, 
+           tmax = json_data$features$properties$parameter$T2M_MAX %>% unlist, 
+           srad = json_data$features$properties$parameter$ALLSKY_SFC_SW_DWN %>% unlist) %>% 
+    na_if(-99)
+ 
+  
+  # =-=-=-=-=-=-=-=-=
+  Cerete %>% 
+    filter(year %in% unique(data_nasa$year_n) )
+  
+  
+  data_nasa %>% 
+    filter(year_n %in% unique(Cerete$year)  )
+  
+  
+  #data_d = read.csv("D:/_Scripts/usaid_forecast/_package/prediccionClimatica/dailyData/58504f1a006cb93ed40eebe3.csv",header=T,dec=".")
+  sel_obs <- data_d[data_d$year %in% unique(year_n),]
+  sel_nasa <- data_nasa[year_n %in% unique(data_d$year),]
+
+
+  # Aqui voy a probar los nombres de las variables... sera que por si acaso
+  # debo dejar el codigo original comentado.
+
+  ses_tmax <- mean(sel_obs$tmax-sel_nasa$t_max,na.rm=T)
+  ses_tmin <- mean(sel_obs$tmin-sel_nasa$t_min,na.rm=T)
+  ses_srad <- mean(sel_obs$srad-sel_nasa$sol_rad,na.rm=T)
+
+  data_sel_m <- data_nasa[year_n == year_to & month == month_to,]
+  data_sel_m$sol_rad <- data_sel_m$sol_rad+ses_srad
+  data_sel_m$t_min <- data_sel_m$t_min+ses_tmin
+  data_sel_m$t_max <- data_sel_m$t_max+ses_tmax
+
+  data_sel_m$sol_rad[is.na(data_sel_m$sol_rad)] <- mean(data_sel_m$sol_rad,na.rm=T)
+  data_sel_m$t_max[is.na(data_sel_m$t_max)] <- mean(data_sel_m$t_max,na.rm=T)
+  data_sel_m$t_min[is.na(data_sel_m$t_min)] <- mean(data_sel_m$t_min,na.rm=T)
+
+  return(data_sel_m)}
 
 
 
