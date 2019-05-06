@@ -14,6 +14,7 @@ library(tictoc)
 library(glue)
 library(lubridate)
 library(cowsay)
+library(jsonlite)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=- 
 
 
@@ -568,9 +569,6 @@ tictoc::toc() # 16.55 -- less than one minute.
 #-------------Function to extract NASA POWER daily data --------------------------#
 #---------------------------------------------------------------------------------#
 
-
-library(jsonlite)
-
 # INPUT
 # lat: latitud de la estaciÃ³n/sitio de interÃ©s
 # lon: longitud de la estaciÃ³n/sitio de interÃ©s
@@ -579,12 +577,22 @@ library(jsonlite)
 
 lat <- 4.53
 lon <- -76.06	
-year_to <- Sys.Date() %>% year()
-month_to <- Sys.Date() %>% month()
 
-# =-=-=-=-=
-# Testing this parth 
-# data_d <- Cerete
+# In this part we define year_to and month_to...
+if (substring(Sys.Date(),6,7) == "01"){
+  year_to = as.numeric(format(Sys.Date(),"%Y"))-1
+  month_to = 12
+} else {
+  year_to = format(Sys.Date(),"%Y")
+  month_to = as.numeric(format(Sys.Date(),"%m"))-1
+}
+
+
+data <- Cerete
+special_data <- tibble(lat, lon, year_to, month_to)
+
+rm(lon, lat, month_to)
+
 
 
 # It could be possible NASA API in some case some times don't work.
@@ -637,9 +645,9 @@ download_data_nasa <- function(data, special_data){
   
   return(nasa_data_dw)}
 
-# tictoc::tic()
-# nasa_data <- download_data_nasa(Cerete, special_data)
-# tictoc::toc()
+tictoc::tic()
+nasa_data <- download_data_nasa(Cerete, special_data)
+tictoc::toc() # 20.04
 
 
 #### Fix from this part.
@@ -650,6 +658,12 @@ download_data_nasa <- function(data, special_data){
 #---------------------------------------------------------------------------------#
 #-------------- Function to extract Chirp daily data. ----------------------------#
 #---------------------------------------------------------------------------------#
+
+
+# Chirps download....
+# Warning!!!!!!!!!!!!!!!!!!!!!!!!!
+# Remember: Because CIAT have special regulations with ftp, 
+# this only could download if you use servers... I ran this in point server. 
 
 
 # Por ahora no modificar. 
@@ -681,9 +695,10 @@ end.date <- paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date)) %>% 
 
 outDir <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/Chirps'
   
-download_data_chirp = function(ini.date, end.date, year_to, outDir){
+download_data_chirp <- function(ini.date, end.date, year_to, outDir){
   
-  fechas <- seq(as.Date(ini.date), as.Date(end.date), "days") %>% str_replace_all("-", ".")  
+  fechas <- seq(as.Date(ini.date), as.Date(end.date), "days") %>% 
+    str_replace_all("-", ".")  
   
   urls <- paste("ftp://ftp.chg.ucsb.edu/pub/org/chg/products/CHIRP/daily/",year_to,"/chirp.",fechas,".tif",sep="")
   file <- basename(urls)
@@ -693,11 +708,13 @@ download_data_chirp = function(ini.date, end.date, year_to, outDir){
   # download.file(url = urls, destfile = outDir_all)
   purrr::map2(.x = urls, .y = outDir_all, .f = download.file)
   tictoc::toc() # 84.12 seg.
+  
+  return("Datos de CHIRPS descargados!") }
 
-  return("Datos de CHIRPS descargados!")
-}
 
-
+tictoc::tic()
+download_data_chirp(ini.date, end.date, year_to, outDir)
+tictoc::toc() # 6.8 min
 
 ###### 
 
@@ -705,30 +722,39 @@ download_data_chirp = function(ini.date, end.date, year_to, outDir){
 
 # También hay que revisar la lectura del archivo de datos... preguntarle a ed.
 
+
+# También hay que revisar la lectura del archivo de datos... preguntarle a ed.
+
+testing <- list.files(outDir, full.names = TRUE) %>%
+  stack
+
+plot(testing)
+
+
+
+lat <- 4.53
+lon <- -76.06	
+
+try_part <- raster::extract(testing, data.frame(x= 76.06,y= 4.53))
+
+
+
+jmmm <- try_part %>% 
+  t() %>% 
+  as_tibble() %>% 
+  mutate(names = list.files(outDir) %>% str_remove('.tif'))
+
+
+
+
+jmmm$names %>% str_remove(glue::glue('chirp.2019.04.')) %>% as.numeric()
+
+
+
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-
-
-
-#---------------------------------------------------------------------------------#
-#-----------------Exporta los escenarios a nivel diario a .csv--------------------#
-#---------------------------------------------------------------------------------#
-cat("\n Descargando datos observados de NASA POWER... \n")
-
-if (substring(Sys.Date(),6,7) == "01"){
-  year_to = as.numeric(format(Sys.Date(),"%Y"))-1
-  month_to = 12
-} else {
-  year_to = format(Sys.Date(),"%Y")
-  month_to = as.numeric(format(Sys.Date(),"%m"))-1
-}
-
-data_nasa = download_data_nasa(data_coord$lat,data_coord$lon,year_to,month_to,data_d)
 
 cat("\n Extrayendo datos estimados de CHIRP... \n")
-
-
 
 outDir_all = list.files(path_output,pattern = ".tif",full.names = T )
 trs = list()
