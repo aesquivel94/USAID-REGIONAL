@@ -299,34 +299,9 @@ Find_Summary <- function(daily_by_season){
   
   return(Indicators)}
 
- 
-
-
-                                          
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
-###  Run from here results.
-
-
-# Read daily data: 
-Cerete <- readr::read_csv("Resampling/daily_preliminar/Cerete.csv")
-Prob <- readr::read_csv("Resampling/CPT_prob/Cerete1_prob_precip.csv")
-
-# year ...  necesito que identifique el sistema si el año es bisiesto. 
-year_forecast <- Sys.Date() %>% year()
-
-
-CPT_prob <- Prob %>%
-  .[,c(1, 4)] %>%
-  set_names('NDJ', 'FMA') %>%
-  mutate(Type = c('Below', 'Normal', 'Above')) %>%
-  gather(Season, Prob, -Type)
 
 
 # Organizar desde esta parte... 
-
-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
 # 4. Resampling
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
@@ -380,14 +355,14 @@ resampling <-  function(data, CPT_prob, year_forecast){
     unique %>% 
     slice(1) %>% 
     as.numeric()
-
+  
   last_year <- data %>% 
     dplyr::select(year) %>% 
     unique %>% 
     slice(n()) %>% 
     as.numeric()
   
-
+  
   
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   # 2. Organize Probability, monthly data and daily data. 
@@ -400,7 +375,7 @@ resampling <-  function(data, CPT_prob, year_forecast){
     unnest(Times) %>% 
     unnest() %>% 
     nest(-Season)
-
+  
   
   # In this part we create a new variable with monthly data classify.
   Times <- Times %>% 
@@ -411,7 +386,7 @@ resampling <-  function(data, CPT_prob, year_forecast){
   
   # jam <- Times %>% filter(row_number() == 1) %>% dplyr::select(-xi) %>% unnest %>% unnest 
   # quantile(jam$precip, c(0.33, 0.66))
-
+  
   # jam %>% 
   #   arrange(year) %>% 
   #   ggplot(aes(year, precip)) +
@@ -434,7 +409,7 @@ resampling <-  function(data, CPT_prob, year_forecast){
   
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   
- Base_years <- Times %>% 
+  Base_years <- Times %>% 
     mutate(order = paste0(letters[1:2], '.',Season)) %>% 
     dplyr::select(order, cat) %>% 
     unnest %>%
@@ -445,10 +420,10 @@ resampling <-  function(data, CPT_prob, year_forecast){
     set_names(paste0(letters[1:2], '.',  Times$Season)) %>% 
     bind_cols(id = 1:100, .)
   
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+  
   # =-=-=-=-=-=-=-=
   # library(trend)
- 
+  
   
   # This function extract daily data using sample year.  
   daily_data <- Times %>% 
@@ -456,7 +431,7 @@ resampling <-  function(data, CPT_prob, year_forecast){
                                     data = data, Intial_year = Intial_year, 
                                     last_year = last_year)) %>% 
     dplyr::select(Season, daily_data)
-
+  
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
   
   
@@ -473,9 +448,9 @@ resampling <-  function(data, CPT_prob, year_forecast){
     mutate(year = year_forecast) %>% 
     nest(-id) 
   
-
+  
   # Here was Find_Summary function
- 
+  
   # In this part we create sceneries with min and max years 
   # (building from aggregate precipitation).
   Esc_Type <- data_to_esc %>%
@@ -487,17 +462,132 @@ resampling <-  function(data, CPT_prob, year_forecast){
     arrange(Type) %>% 
     dplyr::select(-Season) %>% 
     nest(-Type)
-    
+  
   
   # This object is the mix with 3 data set (sceneries, sample years and sceneries types).
   All_data <- bind_cols( Escenaries %>% mutate(Row = 'a') %>% nest(-Row),
-             Base_years %>% mutate(Row = 'a') %>% nest(-Row) %>% rename(Base_years = 'data')) %>% 
+                         Base_years %>% mutate(Row = 'a') %>% nest(-Row) %>% rename(Base_years = 'data')) %>% 
     bind_cols(Esc_Type %>% mutate(Row = 'a') %>% nest(-Row) %>% rename(Esc_Type = 'data') ) %>% 
     dplyr::select(-Row1, -Row2) 
   
   
   return(All_data)}
 
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+#  5. Function to save all files from resampling.  
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+function_to_save <- function(station, Esc_all, path_out){
+  
+  # data <- Resam %>%  filter(row_number() == 1) %>%  dplyr::select(names, Escenaries)
+  # station <- data %>% dplyr::select(names)
+  # Esc_all <- data %>% dplyr::select(Escenaries) %>% unnest
+  
+  # Daily sceneries (generated with resampling).
+  Escenaries <- Esc_all %>%
+    dplyr::select(data) %>% 
+    unnest
+  
+  Esc_C <- Escenaries %>% 
+    mutate(file_name = glue::glue('{path_out}{station}/escenario_{id}.csv')) 
+  
+  # Creation of the data folder (where the results will be saved). 
+  ifelse(dir.exists(glue::glue('{path_out}{station}')) == FALSE, 
+         dir.create(glue::glue('{path_out}{station}')), 'ok')
+  
+  # Save daily sceneries.
+  walk2(.x = Esc_C$data, .y = Esc_C$file_name, 
+        .f = function(.x, .y){ write_csv(x = .x, path = .y)})
+  
+  
+  # Save scenarios type. 
+  Type_Esc <- Esc_all %>% 
+    dplyr::select(Esc_Type) %>% 
+    unnest %>% 
+    mutate(file_name = glue::glue('{path_out}{station}/escenario_{Type}.csv'))
+  
+  walk2(.x = Type_Esc$data, .y = Type_Esc$file_name, 
+        .f = function(.x, .y){ write_csv(x = .x, path = .y)})
+  
+  
+  # Save resampling years.
+  Esc_all %>% 
+    dplyr::select(Base_years) %>% 
+    unnest %>% 
+    write_csv(., path = glue::glue('{path_out}{station}/Escenario_A.csv'))
+  
+  
+  
+  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  # summary variables files creation.
+  Levels <- Esc_C %>% 
+    dplyr::select(data) %>% 
+    unnest %>% 
+    dplyr::select(month) %>% 
+    unique 
+  
+  
+  summaries <- Esc_C %>% 
+    dplyr::select(id, data) %>% 
+    unnest %>% 
+    mutate(month = factor(month,Levels$month))  %>% 
+    group_by(id, month, year) %>% 
+    summarise(precip = sum(precip), tmax = mean(tmax), tmin = mean(tmin), srad = mean(srad)) %>% 
+    ungroup() %>% 
+    dplyr::select(-id) %>%
+    group_by(month) %>%
+    group_by(year, month) %>%
+    summarise(prec_avg = mean(precip), prec_max = max(precip), prec_min = min(precip),
+              sol_rad_avg = mean(srad), sol_rad_max = max(srad), sol_rad_min = min(srad),
+              t_max_avg = mean(tmax), t_max_max = max(tmax), t_max_min = min(tmax),
+              t_min_avg = mean(tmin), t_min_max = max(tmin), t_min_min = min(tmin)) %>%
+    ungroup()
+  
+  
+  
+  summaries <- summaries %>% 
+    gather(variable, values, -month, -year) %>% 
+    nest(-variable) %>% 
+    mutate(data = purrr::map2(.x = variable, .y = data, .f = function(.x, .y){
+      
+      if(str_detect(.x , 'sol_rad_') == TRUE){
+        .y <- .y  %>% 
+          set_names(c('year', 'month', str_remove(.x , 'sol_rad_')))
+      } else{
+        .y <- .y  %>% 
+          set_names(c('year', 'month', str_extract( .x ,'_[a-z]+') %>% str_remove('_')))
+      }
+      return(.y)})) %>% 
+    mutate(file_name = glue::glue('{path_out}{station}/{variable}.csv'))
+  
+  
+  # Aqui se guardan los archivos...
+  walk2(.x = summaries$data, .y = summaries$file_name,
+        .f = function(.x, .y){write_csv(x = .x, path = .y)})
+  
+}
+
+                                          
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
+###  Run from here results.
+
+
+# Read daily data: 
+Cerete <- readr::read_csv("Resampling/daily_preliminar/Cerete.csv")
+Prob <- readr::read_csv("Resampling/CPT_prob/Cerete1_prob_precip.csv")
+
+# year ...  necesito que identifique el sistema si el año es bisiesto. 
+year_forecast <- Sys.Date() %>% year()
+
+
+CPT_prob <- Prob %>%
+  .[,c(1, 4)] %>%
+  set_names('NDJ', 'FMA') %>%
+  mutate(Type = c('Below', 'Normal', 'Above')) %>%
+  gather(Season, Prob, -Type)
 
 
 
@@ -565,104 +655,11 @@ tictoc::toc() # 16.55 -- less than one minute.
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-# Aqui hay que poner los guardados extra de 
 path_out <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/results/'
 
 
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-function_to_save <- function(station, Esc_all, path_out){
-  
-  # data <- Resam %>%  filter(row_number() == 1) %>%  dplyr::select(names, Escenaries)
-  # station <- data %>% dplyr::select(names)
-  # Esc_all <- data %>% dplyr::select(Escenaries) %>% unnest
-  
-  # Daily sceneries (generated with resampling).
-  Escenaries <- Esc_all %>%
-    dplyr::select(data) %>% 
-    unnest
-  
-  Esc_C <- Escenaries %>% 
-    mutate(file_name = glue::glue('{path_out}{station}/escenario_{id}.csv')) 
-  
-  # Creation of the data folder (where the results will be saved). 
-  ifelse(dir.exists(glue::glue('{path_out}{station}')) == FALSE, 
-         dir.create(glue::glue('{path_out}{station}')), 'ok')
-
-  # Save daily sceneries.
-  walk2(.x = Esc_C$data, .y = Esc_C$file_name, 
-                      .f = function(.x, .y){ write_csv(x = .x, path = .y)})
-  
-  
-  # Save scenarios type. 
-  Type_Esc <- Esc_all %>% 
-    dplyr::select(Esc_Type) %>% 
-    unnest %>% 
-    mutate(file_name = glue::glue('{path_out}{station}/escenario_{Type}.csv'))
-  
-  walk2(.x = Type_Esc$data, .y = Type_Esc$file_name, 
-        .f = function(.x, .y){ write_csv(x = .x, path = .y)})
-  
-  
-  # Save resampling years.
-  Esc_all %>% 
-    dplyr::select(Base_years) %>% 
-    unnest %>% 
-    write_csv(., path = glue::glue('{path_out}{station}/Escenario_A.csv'))
-  
-
-  
-  # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  # summary variables files creation.
-  Levels <- Esc_C %>% 
-    dplyr::select(data) %>% 
-    unnest %>% 
-    dplyr::select(month) %>% 
-    unique 
-  
-
-  summaries <- Esc_C %>% 
-    dplyr::select(id, data) %>% 
-    unnest %>% 
-    mutate(month = factor(month,Levels$month))  %>% 
-    group_by(id, month, year) %>% 
-    summarise(precip = sum(precip), tmax = mean(tmax), tmin = mean(tmin), srad = mean(srad)) %>% 
-    ungroup() %>% 
-    dplyr::select(-id) %>%
-    group_by(month) %>%
-      group_by(year, month) %>%
-      summarise(prec_avg = mean(precip), prec_max = max(precip), prec_min = min(precip),
-                sol_rad_avg = mean(srad), sol_rad_max = max(srad), sol_rad_min = min(srad),
-                t_max_avg = mean(tmax), t_max_max = max(tmax), t_max_min = min(tmax),
-                t_min_avg = mean(tmin), t_min_max = max(tmin), t_min_min = min(tmin)) %>%
-    ungroup()
-    
-    
-   
-  summaries <- summaries %>% 
-    gather(variable, values, -month, -year) %>% 
-    nest(-variable) %>% 
-    mutate(data = purrr::map2(.x = variable, .y = data, .f = function(.x, .y){
-      
-      if(str_detect(.x , 'sol_rad_') == TRUE){
-        .y <- .y  %>% 
-          set_names(c('year', 'month', str_remove(.x , 'sol_rad_')))
-      } else{
-        .y <- .y  %>% 
-          set_names(c('year', 'month', str_extract( .x ,'_[a-z]+') %>% str_remove('_')))
-      }
-      return(.y)})) %>% 
-  mutate(file_name = glue::glue('{path_out}{station}/{variable}.csv'))
-
-  
-  # Aqui se guardan los archivos...
-  walk2(.x = summaries$data, .y = summaries$file_name,
-        .f = function(.x, .y){write_csv(x = .x, path = .y)})
-  
-}
-
-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
+# # Save all files from resampling. 
 purrr::map2(.x = Resam$names, .y = Resam$Escenaries, 
             .f = function_to_save, path_out = path_out)
 
@@ -673,19 +670,45 @@ purrr::map2(.x = Resam$names, .y = Resam$Escenaries,
 
 
 
+# .------..------..------..------..------..------..------..------..------..------.
+# |N.--. ||A.--. ||S.--. ||A.--. ||&.--. ||C.--. ||H.--. ||I.--. ||R.--. ||P.--. |
+# | :(): || (\/) || :/\: || (\/) || :(): || :/\: || :/\: || (\/) || :(): || :/\: |
+# | ()() || :\/: || :\/: || :\/: || ()() || :\/: || (__) || :\/: || ()() || (__) |
+# | '--'N|| '--'A|| '--'S|| '--'A|| '--'&|| '--'C|| '--'H|| '--'I|| '--'R|| '--'P|
+# `------'`------'`------'`------'`------'`------'`------'`------'`------'`------'
 
 
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# Aquí hay que agregar todo lo de descarga de Chirps y de NASA Power... además agregar a Resam
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# This section run for all locations. 
 
 
-#---------------------------------------------------------------------------------#
-#-------------Function to extract NASA POWER daily data --------------------------#
-#---------------------------------------------------------------------------------#
+# =-=-=-=-=-=-=
+# Functions. 
+# =-=-=-=-=-=-=
 
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 0. Function to download Chirp data
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+download_data_chirp <- function(ini.date, end.date, year_to, path_Chirp){
+  
+  fechas <- seq(as.Date(ini.date), as.Date(end.date), "days") %>% str_replace_all("-", ".")  
+  
+  urls <- paste("ftp://ftp.chg.ucsb.edu/pub/org/chg/products/CHIRP/daily/",year_to,"/chirp.",fechas,".tif",sep="")
+  file <- basename(urls)
+  path_Chirp_all <- paste0(path_Chirp,"/",file)
+  
+  tictoc::tic()
+  # download.file(url = urls, destfile = path_Chirp_all)
+  purrr::map2(.x = urls, .y = path_Chirp_all, .f = download.file)
+  tictoc::toc() # 84.12 seg.
+  
+  return("Datos de CHIRPS descargados!") }
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 1. Function to extract NASA POWER daily data 
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 # INPUT
 # lat: latitud de la estaciÃ³n/sitio de interÃ©s
@@ -693,28 +716,10 @@ purrr::map2(.x = Resam$names, .y = Resam$Escenaries,
 # year_to: actual year
 # month_to: actual month
 
-lat <- 4.53
-lon <- -76.06	
-
-# In this part we define year_to and month_to...
-if (substring(Sys.Date(),6,7) == "01"){
-  year_to = as.numeric(format(Sys.Date(),"%Y"))-1
-  month_to = 12
-} else {
-  year_to = format(Sys.Date(),"%Y")
-  month_to = as.numeric(format(Sys.Date(),"%m"))-1
-}
-
-
-data <- Cerete
-special_data <- tibble(lat, lon, year_to, month_to)
-
-rm(lon, lat, month_to)
-
-
 # =-=-=-=-=
 # Testing this parth 
 # data_d <- Cerete
+# special_data <-  it's a tibble: tibble(lat, lon, year_to, month_to). 
 
 # It could be possible NASA API in some case some times don't work. 
 download_data_nasa <- function(data, special_data){
@@ -768,6 +773,123 @@ download_data_nasa <- function(data, special_data){
   return(nasa_data_dw)}
 
 
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 2. Function to extract Chirp data and Join with NASA POWER DATA. 
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+Join_extract <- function(data, special_data, path_Chirp){
+  
+  # Download Nasa data. 
+  nasa_data <- download_data_nasa(data, special_data)
+  
+  # Extract Chirp data 
+  monthly <- ifelse(month_to < 10, glue::glue('0{month_to}'), month_to)
+  
+  
+  chirp_data <- list.files(path_Chirp, full.names = TRUE) %>%
+    stack %>% 
+    raster::extract(., data.frame(x= special_data$lon,y= special_data$lat)) %>% # arreglar aqui 
+    t() %>% 
+    as_tibble() %>% 
+    set_names('precip') %>% 
+    mutate(names = list.files(path_Chirp) %>% str_remove('.tif'), 
+           day_name = names %>% str_remove(glue::glue('chirp.{year_to}.{monthly}.')), # arreglar aqui 
+           day = as.numeric(day_name)) %>% 
+    dplyr::select(-names)
+  
+  
+  # Join Chirp and NASA data. 
+  final_month <- right_join(chirp_data, nasa_data) %>% 
+    dplyr::select(day, month, year_n, precip, tmax, tmin, srad) %>% 
+    rename(year = 'year_n')
+  
+  return(final_month)}
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# 3. Function to add 
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+complete_data <-  function(path){
+  
+  post <- list.files(path = path, pattern = 'escenario_') %>% 
+    str_detect(c('max', 'min')) 
+  
+  
+  complete_data <- list.files(path = path, pattern = 'escenario_', full.names = TRUE) %>% 
+    as_tibble() %>% 
+    filter(row_number() != which(post))%>% 
+    mutate(data = purrr::map(.x = value, .f = read_csv), 
+           complete_data = purrr::map(.x = data, .f = function(.x){bind_rows(month_satel, .x) })) %>% 
+    dplyr::select(complete_data)
+  
+  return(complete_data)}
+
+
+
+
+
+jmm <- Resam %>%
+  dplyr::select(names) %>% 
+  mutate(path = paste0(path_out, names), 
+         complete_data = purrr::map(.x = path, .f = complete_data))
+
+
+
+# jmm %>% 
+#   filter()
+
+
+
+
+
+
+
+# function_to_save
+# 
+# Esc_C <- Escenaries %>% 
+#   mutate(file_name = glue::glue('{path_out}{station}/escenario_{id}.csv')) 
+# 
+# # Creation of the data folder (where the results will be saved). 
+# ifelse(dir.exists(glue::glue('{path_out}{station}')) == FALSE, 
+#        dir.create(glue::glue('{path_out}{station}')), 'ok')
+# 
+# # Save daily sceneries.
+# walk2(.x = Esc_C$data, .y = Esc_C$file_name, 
+#       .f = function(.x, .y){ write_csv(x = .x, path = .y)})
+
+
+
+
+
+
+
+# Run for one station NASA-POWER download. 
+
+
+lat <- 4.53
+lon <- -76.06	
+
+# In this part we define year_to and month_to...
+if (substring(Sys.Date(),6,7) == "01"){
+  year_to = as.numeric(format(Sys.Date(),"%Y"))-1
+  month_to = 12
+} else {
+  year_to = format(Sys.Date(),"%Y")
+  month_to = as.numeric(format(Sys.Date(),"%m"))-1
+}
+
+
+data <- Cerete
+special_data <- tibble(lat, lon, year_to, month_to)
+
+rm(lon, lat, month_to)
+
+
 tictoc::tic()
 nasa_data <- download_data_nasa(Cerete, special_data)
 tictoc::toc()
@@ -801,79 +923,48 @@ if (substring(Sys.Date(),6,7) == "01"){
 }
 
 
-
 ini.date <- paste0(substr_year,"-",substr_month,"-01") %>%  as.Date()
 # .... 
 end.date <- paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date)) %>% as.Date()
 
-outDir <- 'C:/Users/AESQUIVEL/Desktop/Resampling/Chirps'
-
-download_data_chirp <- function(ini.date, end.date, year_to, outDir){
-  
-  fechas <- seq(as.Date(ini.date), as.Date(end.date), "days") %>% str_replace_all("-", ".")  
-  
-  urls <- paste("ftp://ftp.chg.ucsb.edu/pub/org/chg/products/CHIRP/daily/",year_to,"/chirp.",fechas,".tif",sep="")
-  file <- basename(urls)
-  outDir_all <- paste0(outDir,"/",file)
-  
-  tictoc::tic()
-  # download.file(url = urls, destfile = outDir_all)
-  purrr::map2(.x = urls, .y = outDir_all, .f = download.file)
-  tictoc::toc() # 84.12 seg.
-  
-  return("Datos de CHIRPS descargados!") }
+path_Chirp <- 'C:/Users/AESQUIVEL/Desktop/Resampling/Chirps'
 
 
 tictoc::tic()
-download_data_chirp(ini.date, end.date, year_to, outDir)
+download_data_chirp(ini.date, end.date, year_to, path_Chirp)
 tictoc::toc() # 6.8 min
 
 
 
-# También hay que revisar la lectura del archivo de datos... preguntarle a ed.
 
-testing <- list.files(outDir, full.names = TRUE) %>%
-  stack
 
-plot(testing)
-
+# =-=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=...
+### Aqui se crea el archivo conjunto. 
 
 
 lat <- 4.53
 lon <- -76.06	
 
-try_part <- raster::extract(testing, data.frame(x= 76.06,y= 4.53))
 
-# Aqui debo arreglar esto.
-
-jmmm <- try_part %>% 
-  t() %>% 
-  as_tibble() %>% 
-  set_names('precip') %>% 
-  mutate(names = list.files(outDir) %>% str_remove('.tif'), 
-         day_name = names %>% str_remove(glue::glue('chirp.2019.04.')), 
-         day = as.numeric(day_name)) %>% 
-  dplyr::select(-names)
+if (substring(Sys.Date(),6,7) == "01"){
+  year_to = as.numeric(format(Sys.Date(),"%Y"))-1
+  month_to = 12
+} else {
+  year_to = format(Sys.Date(),"%Y")
+  month_to = as.numeric(format(Sys.Date(),"%m"))-1
+}
 
 
-
-
-jmmm
-nasa_data
-
-
-
-final_month <- right_join(jmmm, nasa_data) %>% 
-  dplyr::select(day, month, year_n, precip, tmax, tmin, srad) %>% 
-  rename(year = 'year_n')
+special_data <- tibble(lat, lon, year_to, month_to)
+# data <- Cerete
 
 
 
 
 
-
-
-
+tictoc::tic()
+month_satel <- Join_extract(Cerete, special_data, path_Chirp)
+tictoc::toc() # 26.03 seg
 
 
 
