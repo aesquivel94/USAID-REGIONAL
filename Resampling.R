@@ -15,6 +15,7 @@ library(glue)
 library(lubridate)
 library(cowsay)
 library(jsonlite)
+library(raster)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=- 
 
 
@@ -558,259 +559,9 @@ Resam <- Initial_data %>%
 tictoc::toc() # 16.55 -- less than one minute.
 
 
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# Aquí hay que agregar todo lo de descarga de Chirps y de NASA Power... además agregar a Resam
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-
-#---------------------------------------------------------------------------------#
-#-------------Function to extract NASA POWER daily data --------------------------#
-#---------------------------------------------------------------------------------#
-
-# INPUT
-# lat: latitud de la estaciÃ³n/sitio de interÃ©s
-# lon: longitud de la estaciÃ³n/sitio de interÃ©s
-# year_to: actual year
-# month_to: actual month
-
-lat <- 4.53
-lon <- -76.06	
-
-# In this part we define year_to and month_to...
-if (substring(Sys.Date(),6,7) == "01"){
-  year_to = as.numeric(format(Sys.Date(),"%Y"))-1
-  month_to = 12
-} else {
-  year_to = format(Sys.Date(),"%Y")
-  month_to = as.numeric(format(Sys.Date(),"%m"))-1
-}
-
-
-data <- Cerete
-special_data <- tibble(lat, lon, year_to, month_to)
-
-rm(lon, lat, month_to)
-
-
-
-# It could be possible NASA API in some case some times don't work.
-download_data_nasa <- function(data, special_data){
-  # data <- Cerete
-  # special_data <- tibble(lat, lon, year_to, month_to)
-  
-  lat <- special_data$lat
-  lon <- special_data$lon
-  year_to <- special_data$year_to
-  month_to <- special_data$month_to
-  
-  # do NASA path. 
-  json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
-  # download json. 
-  json_data <- jsonlite::fromJSON(json_file)
-  
-  # Do NASA data set. 
-  data_nasa <-  tibble(dates = seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")) %>%  
-    mutate(year_n = year(dates), month = month(dates), day = day(dates),
-           tmin = json_data$features$properties$parameter$T2M_MIN %>% unlist, 
-           tmax = json_data$features$properties$parameter$T2M_MAX %>% unlist, 
-           srad = json_data$features$properties$parameter$ALLSKY_SFC_SW_DWN %>% unlist) %>% 
-    na_if(-99)
- 
-
-  # Join observed and NASA data. 
-  all_data <- right_join( data %>% 
-                filter(year %in% unique(data_nasa$year_n) ) %>% dplyr::select(-precip),
-              data_nasa %>% 
-                filter(year_n %in% unique(data$year)) %>% 
-                set_names('dates', 'year', 'month', 'day', 'tmin_N', 'tmax_N', 'srad_N'))
-  
-  
-  # Bias between observed data and NASA data. 
-  mean_less <- all_data %>% 
-    summarise(mean_max = mean(tmax-tmax_N, na.rm = TRUE), 
-              mean_min = mean(tmin - tmin_N, na.rm = TRUE),
-              mean_srad = mean(srad - srad_N, na.rm = TRUE))
-  
-  # data full with mean NASA. 
-  nasa_data_dw <- data_nasa %>% 
-    filter(year_n == year_to, month == month_to) %>% 
-    mutate(tmax = tmax + pull(mean_less, mean_max), 
-           tmin = tmin + pull(mean_less, mean_min),
-           srad = srad + pull(mean_less, mean_srad)) %>% 
-    mutate(tmax = ifelse(is.na(tmax), mean(tmax, na.rm = TRUE), tmax),
-           tmin = ifelse(is.na(tmin), mean(tmin, na.rm = TRUE), tmin),
-           srad = ifelse(is.na(srad), mean(srad, na.rm = TRUE), srad))
-  
-  return(nasa_data_dw)}
-
-tictoc::tic()
-nasa_data <- download_data_nasa(Cerete, special_data)
-tictoc::toc() # 20.04
-
-
-#### Fix from this part.
-# I guess it's necesary do 2 functions more, because we need do all month...
-# extract chirps for that points and join with NASA data
-# and put this before the resampling. 
-
-#---------------------------------------------------------------------------------#
-#-------------- Function to extract Chirp daily data. ----------------------------#
-#---------------------------------------------------------------------------------#
-
-
-# Chirps download....
-# Warning!!!!!!!!!!!!!!!!!!!!!!!!!
-# Remember: Because CIAT have special regulations with ftp, 
-# this only could download if you use servers... I ran this in point server. 
-
-
-# Por ahora no modificar. 
-numberOfDays <- function(date) {
-  m <- format(date, format="%m")
-  
-  while (format(date, format="%m") == m) {
-    date <- date + 1
-}
-  
-  return(as.integer(format(date - 1, format="%d")))
-}
-
-
-# Creo que esto es para arreglar diciembre...
-if (substring(Sys.Date(),6,7) == "01"){
-  substr_month <- "12"
-  substr_year <- year(Sys.Date()) - 1
-} else {
-  substr_month <- str_pad(as.numeric(substring(Sys.Date(),6,7))-1,2,pad = "0")
-  substr_year <- year(Sys.Date())
-}
-
-ini.date <- paste0(substr_year,"-",substr_month,"-01") %>%  as.Date()
-# .... 
-end.date <- paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date)) %>% as.Date()
-
-
-
-outDir <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/Chirps'
-  
-download_data_chirp <- function(ini.date, end.date, year_to, outDir){
-  
-  fechas <- seq(as.Date(ini.date), as.Date(end.date), "days") %>% 
-    str_replace_all("-", ".")  
-  
-  urls <- paste("ftp://ftp.chg.ucsb.edu/pub/org/chg/products/CHIRP/daily/",year_to,"/chirp.",fechas,".tif",sep="")
-  file <- basename(urls)
-  outDir_all <- paste0(outDir,"/",file)
-  
-  tictoc::tic()
-  # download.file(url = urls, destfile = outDir_all)
-  purrr::map2(.x = urls, .y = outDir_all, .f = download.file)
-  tictoc::toc() # 84.12 seg.
-  
-  return("Datos de CHIRPS descargados!") }
-
-
-tictoc::tic()
-download_data_chirp(ini.date, end.date, year_to, outDir)
-tictoc::toc() # 6.8 min
-
-###### 
-
-
-
-# También hay que revisar la lectura del archivo de datos... preguntarle a ed.
-
-
-# También hay que revisar la lectura del archivo de datos... preguntarle a ed.
-
-testing <- list.files(outDir, full.names = TRUE) %>%
-  stack
-
-plot(testing)
-
-
-
-lat <- 4.53
-lon <- -76.06	
-
-try_part <- raster::extract(testing, data.frame(x= 76.06,y= 4.53))
-
-
-
-jmmm <- try_part %>% 
-  t() %>% 
-  as_tibble() %>% 
-  mutate(names = list.files(outDir) %>% str_remove('.tif'))
-
-
-
-
-jmmm$names %>% str_remove(glue::glue('chirp.2019.04.')) %>% as.numeric()
-
-
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-cat("\n Extrayendo datos estimados de CHIRP... \n")
-
-outDir_all = list.files(path_output,pattern = ".tif",full.names = T )
-trs = list()
-for(j in 1:length(outDir_all)){ trs[[j]] <- raster(outDir_all[j]) }
-
-trs_st = stack(trs)
-
-extr_vals <- raster::extract(trs_st, data.frame(x=data_coord$lon,y=data_coord$lat))
-data_chirp <- as.numeric(extr_vals)
-
-
-z=seq(as.Date(ini.date), as.Date(end.date), "days")
-data_obs_m =  cbind.data.frame("day" = as.numeric(format(z,"%d")),"month" = as.numeric(format(z,"%m")), "year" = as.numeric(format(z,"%Y")),"t_max"= data_nasa$t_max,"t_min"=data_nasa$t_min,"prec" = data_chirp,"sol_rad" = data_nasa$sol_rad)
-for(k in 1:nrow(escenarios_final)){
-  to.write = rbind.data.frame( data_obs_m,esc_final_diarios[[k]])
-  write.csv(to.write,paste(path_output,"/",station,"/escenario_",nom[k],".csv",sep=""),row.names=F)
-}
-
-
-
-
-
-# =-=
-
-cl <- makeCluster(detectCores() - 2) # numero de nucleos proceso en paralelo
-
-substr_year <- substring(Sys.Date(),1,4)
-
-if (substring(Sys.Date(),6,7) == "01"){
-  substr_month <- "12"
-  substr_year <- as.numeric(substring(Sys.Date(),1,4))-1
-} else {
-  substr_month <- str_pad(as.numeric(substring(Sys.Date(),6,7))-1,2,pad = "0")
-  substr_year <- substring(Sys.Date(),1,4)
-}
-
-ini.date = paste0(substr_year,"-",substr_month,"-01")
-ini.date = as.Date(ini.date)
-
-end.date = paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date))
-end.date = as.Date(end.date)
-
-
-download_data_chirp(ini.date,end.date,year_to = substr_year,outDir = path_output,cl)
-
-
-
-
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-
-
-
-
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -914,6 +665,213 @@ function_to_save <- function(station, Esc_all, path_out){
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
 purrr::map2(.x = Resam$names, .y = Resam$Escenaries, 
             .f = function_to_save, path_out = path_out)
+
+
+
+
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# Aquí hay que agregar todo lo de descarga de Chirps y de NASA Power... además agregar a Resam
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+#---------------------------------------------------------------------------------#
+#-------------Function to extract NASA POWER daily data --------------------------#
+#---------------------------------------------------------------------------------#
+
+
+# INPUT
+# lat: latitud de la estaciÃ³n/sitio de interÃ©s
+# lon: longitud de la estaciÃ³n/sitio de interÃ©s
+# year_to: actual year
+# month_to: actual month
+
+lat <- 4.53
+lon <- -76.06	
+
+# In this part we define year_to and month_to...
+if (substring(Sys.Date(),6,7) == "01"){
+  year_to = as.numeric(format(Sys.Date(),"%Y"))-1
+  month_to = 12
+} else {
+  year_to = format(Sys.Date(),"%Y")
+  month_to = as.numeric(format(Sys.Date(),"%m"))-1
+}
+
+
+data <- Cerete
+special_data <- tibble(lat, lon, year_to, month_to)
+
+rm(lon, lat, month_to)
+
+
+# =-=-=-=-=
+# Testing this parth 
+# data_d <- Cerete
+
+# It could be possible NASA API in some case some times don't work. 
+download_data_nasa <- function(data, special_data){
+  # data <- Cerete
+  # special_data <- tibble(lat, lon, year_to, month_to)
+  
+  lat <- special_data$lat
+  lon <- special_data$lon
+  year_to <- special_data$year_to
+  month_to <- special_data$month_to
+  
+  
+  json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
+  # Esta mostrando un error que no conozco.
+  json_data <- jsonlite::fromJSON(json_file)
+  
+  
+  data_nasa <-  tibble(dates = seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")) %>%  
+    mutate(year_n = year(dates), month = month(dates), day = day(dates),
+           tmin = json_data$features$properties$parameter$T2M_MIN %>% unlist, 
+           tmax = json_data$features$properties$parameter$T2M_MAX %>% unlist, 
+           srad = json_data$features$properties$parameter$ALLSKY_SFC_SW_DWN %>% unlist) %>% 
+    na_if(-99)
+  
+  
+  
+  # Join observed and NASA data. 
+  all_data <- right_join( data %>% 
+                            filter(year %in% unique(data_nasa$year_n) ) %>% dplyr::select(-precip),
+                          data_nasa %>% 
+                            filter(year_n %in% unique(data$year)) %>% 
+                            set_names('dates', 'year', 'month', 'day', 'tmin_N', 'tmax_N', 'srad_N'))
+  
+  
+  # Bias between observed data and NASA data. 
+  mean_less <- all_data %>% 
+    summarise(mean_max = mean(tmax-tmax_N, na.rm = TRUE), 
+              mean_min = mean(tmin - tmin_N, na.rm = TRUE),
+              mean_srad = mean(srad - srad_N, na.rm = TRUE))
+  
+  # data full with mean NASA. 
+  nasa_data_dw <- data_nasa %>% 
+    filter(year_n == year_to, month == month_to) %>% 
+    mutate(tmax = tmax + pull(mean_less, mean_max), 
+           tmin = tmin + pull(mean_less, mean_min),
+           srad = srad + pull(mean_less, mean_srad)) %>% 
+    mutate(tmax = ifelse(is.na(tmax), mean(tmax, na.rm = TRUE), tmax),
+           tmin = ifelse(is.na(tmin), mean(tmin, na.rm = TRUE), tmin),
+           srad = ifelse(is.na(srad), mean(srad, na.rm = TRUE), srad))
+  
+  return(nasa_data_dw)}
+
+
+tictoc::tic()
+nasa_data <- download_data_nasa(Cerete, special_data)
+tictoc::toc()
+
+
+
+#---------------------------------------------------------------------------------#
+#-------------- Function to extract Chirp daily data. ----------------------------#
+#---------------------------------------------------------------------------------#
+
+
+# Por ahora no modificar. 
+numberOfDays <- function(date) {
+  m <- format(date, format="%m")
+  
+  while (format(date, format="%m") == m) {
+    date <- date + 1
+  }
+  
+  return(as.integer(format(date - 1, format="%d")))
+}
+
+
+# Creo que esto es para arreglar diciembre...
+if (substring(Sys.Date(),6,7) == "01"){
+  substr_month <- "12"
+  substr_year <- year(Sys.Date()) - 1
+} else {
+  substr_month <- str_pad(as.numeric(substring(Sys.Date(),6,7))-1,2,pad = "0")
+  substr_year <- year(Sys.Date())
+}
+
+
+
+ini.date <- paste0(substr_year,"-",substr_month,"-01") %>%  as.Date()
+# .... 
+end.date <- paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date)) %>% as.Date()
+
+outDir <- 'C:/Users/AESQUIVEL/Desktop/Resampling/Chirps'
+
+download_data_chirp <- function(ini.date, end.date, year_to, outDir){
+  
+  fechas <- seq(as.Date(ini.date), as.Date(end.date), "days") %>% str_replace_all("-", ".")  
+  
+  urls <- paste("ftp://ftp.chg.ucsb.edu/pub/org/chg/products/CHIRP/daily/",year_to,"/chirp.",fechas,".tif",sep="")
+  file <- basename(urls)
+  outDir_all <- paste0(outDir,"/",file)
+  
+  tictoc::tic()
+  # download.file(url = urls, destfile = outDir_all)
+  purrr::map2(.x = urls, .y = outDir_all, .f = download.file)
+  tictoc::toc() # 84.12 seg.
+  
+  return("Datos de CHIRPS descargados!") }
+
+
+tictoc::tic()
+download_data_chirp(ini.date, end.date, year_to, outDir)
+tictoc::toc() # 6.8 min
+
+
+
+# También hay que revisar la lectura del archivo de datos... preguntarle a ed.
+
+testing <- list.files(outDir, full.names = TRUE) %>%
+  stack
+
+plot(testing)
+
+
+
+lat <- 4.53
+lon <- -76.06	
+
+try_part <- raster::extract(testing, data.frame(x= 76.06,y= 4.53))
+
+# Aqui debo arreglar esto.
+
+jmmm <- try_part %>% 
+  t() %>% 
+  as_tibble() %>% 
+  set_names('precip') %>% 
+  mutate(names = list.files(outDir) %>% str_remove('.tif'), 
+         day_name = names %>% str_remove(glue::glue('chirp.2019.04.')), 
+         day = as.numeric(day_name)) %>% 
+  dplyr::select(-names)
+
+
+
+
+jmmm
+nasa_data
+
+
+
+final_month <- right_join(jmmm, nasa_data) %>% 
+  dplyr::select(day, month, year_n, precip, tmax, tmin, srad) %>% 
+  rename(year = 'year_n')
+
+
+
+
+
+
 
 
 
