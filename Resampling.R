@@ -678,9 +678,7 @@ purrr::map2(.x = Resam$names, .y = Resam$Escenaries,
 # `------'`------'`------'`------'`------'`------'`------'`------'`------'`------'
 
 
-# This section run for all locations. 
-
-
+# This section run for all locations with the same dates.  
 # =-=-=-=-=-=-=
 # Functions. 
 # =-=-=-=-=-=-=
@@ -808,13 +806,11 @@ Join_extract <- function(data, special_data, path_Chirp){
   return(final_month)}
 
 
-
-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 3. Function to add 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-complete_data <-  function(path){
+complete_data <-  function(path, Satellite){
   
   post <- list.files(path = path, pattern = 'escenario_') %>% 
     str_detect(c('max', 'min')) 
@@ -824,45 +820,29 @@ complete_data <-  function(path){
     as_tibble() %>% 
     filter(row_number() != which(post))%>% 
     mutate(data = purrr::map(.x = value, .f = read_csv), 
-           complete_data = purrr::map(.x = data, .f = function(.x){bind_rows(month_satel, .x) })) %>% 
+           complete_data = purrr::map(.x = data, .f = function(.x){bind_rows(Satellite, .x) })) %>% 
     dplyr::select(complete_data)
   
   return(complete_data)}
 
 
+##############################################################################
 
+# data <- jmm %>% filter(row_number() == 1) %>% select(complete_data) %>% unnest
+# path <- jmm %>% filter(row_number() == 1) %>% select(path) %>% as.character()
 
-
-jmm <- Resam %>%
-  dplyr::select(names) %>% 
-  mutate(path = paste0(path_out, names), 
-         complete_data = purrr::map(.x = path, .f = complete_data))
-
-
-
-# jmm %>% 
-#   filter()
-
-
-
-
-
-
-
-# function_to_save
-# 
-# Esc_C <- Escenaries %>% 
-#   mutate(file_name = glue::glue('{path_out}{station}/escenario_{id}.csv')) 
-# 
-# # Creation of the data folder (where the results will be saved). 
-# ifelse(dir.exists(glue::glue('{path_out}{station}')) == FALSE, 
-#        dir.create(glue::glue('{path_out}{station}')), 'ok')
-# 
-# # Save daily sceneries.
-# walk2(.x = Esc_C$data, .y = Esc_C$file_name, 
-#       .f = function(.x, .y){ write_csv(x = .x, path = .y)})
-
-
+function_replace <- function(data, path){
+  
+  replace_data <- data %>% 
+    mutate(id = 1:100, 
+           path = glue::glue('{path}/escenario_{id}.csv')) 
+  
+  
+  # Save new daily sceneries.
+  walk2(.x = replace_data$complete_data, .y = replace_data$ path,
+        .f = function(.x, .y){ write_csv(x = .x, path = .y)})
+  
+}
 
 
 
@@ -890,14 +870,14 @@ special_data <- tibble(lat, lon, year_to, month_to)
 rm(lon, lat, month_to)
 
 
-tictoc::tic()
-nasa_data <- download_data_nasa(Cerete, special_data)
-tictoc::toc()
+# tictoc::tic()
+# nasa_data <- download_data_nasa(Cerete, special_data)
+# tictoc::toc()
 
 
 
 #---------------------------------------------------------------------------------#
-#-------------- Function to extract Chirp daily data. ----------------------------#
+#---------------- From this point we download data. ------------------------------#
 #---------------------------------------------------------------------------------#
 
 
@@ -927,24 +907,17 @@ ini.date <- paste0(substr_year,"-",substr_month,"-01") %>%  as.Date()
 # .... 
 end.date <- paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date)) %>% as.Date()
 
-path_Chirp <- 'C:/Users/AESQUIVEL/Desktop/Resampling/Chirps'
+path_Chirp <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/Chirps'
 
-
+# Hay que revisar como esta funcionando 
 tictoc::tic()
 download_data_chirp(ini.date, end.date, year_to, path_Chirp)
 tictoc::toc() # 6.8 min
 
 
 
-
-
 # =-=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=...
 ### Aqui se crea el archivo conjunto. 
-
-
-lat <- 4.53
-lon <- -76.06	
-
 
 if (substring(Sys.Date(),6,7) == "01"){
   year_to = as.numeric(format(Sys.Date(),"%Y"))-1
@@ -955,20 +928,36 @@ if (substring(Sys.Date(),6,7) == "01"){
 }
 
 
-special_data <- tibble(lat, lon, year_to, month_to)
-# data <- Cerete
+lat_lon <- read_csv('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/coordenadas.csv')
 
 
+# =-=-=-= Organizar desde aqui... 
+# tictoc::tic()
+# month_satel <- Join_extract(Cerete, special_data, path_Chirp)
+# tictoc::toc() # 26.03 seg
+# 
+# 
+# special_data <- tibble(lat = 4.53, lon = -76.06	, year_to, month_to)
+# # data <- Cerete
 
 
+# jmm <- Resam %>%
+#   dplyr::select(names) %>% 
+#   mutate(path = paste0(path_out, names), 
+#          complete_data = purrr::map(.x = path, .f = complete_data))
 
-tictoc::tic()
-month_satel <- Join_extract(Cerete, special_data, path_Chirp)
-tictoc::toc() # 26.03 seg
-
-
-
-
-
+# walk2(.x = jmm$complete_data, .y = jmm$path,
+#       .f = function_replace)
 
 
+jmm <- Initial_data %>% 
+  dplyr::select(names) %>% 
+  mutate(path = paste0(path_out, names), year_to, month_to) %>% 
+  right_join(., lat_lon) %>% 
+  nest(-names, -path) %>% 
+  right_join(., Initial_data) %>% 
+  dplyr::select(-CPT_prob) %>% 
+  mutate(satellite_data = purrr::map2(.x = stations, .y = data, .f = Join_extract, path_Chirp)) %>% 
+  dplyr::select(-stations, -data) 
+
+# Falta correr complete_data... revisar... y ya se terminaría esta parte... 
