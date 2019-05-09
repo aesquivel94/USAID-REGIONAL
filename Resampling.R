@@ -1,7 +1,7 @@
 rm(list = ls()); gc(reset = TRUE)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Made by:     Alejandra Esquivel Arias. 
-# Created in:  Date: 4-2019.
+# Created in:  Date: 5-2019.
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Resampling Methodology 
 
@@ -178,7 +178,7 @@ do_organize_data <- function(Season, xi, data, Intial_year, last_year){
 sample_category <- function(Prob){
   # Prob <- Times %>%  filter(row_number() == 1) %>% dplyr::select(xi) %>% unnest()
   
-  # Hace el re muestreo de las categorías...
+  # Does the re-sampling of the categories...
   Type_cat <- tibble( id = 1:100) %>% 
     mutate(sample_cat = purrr::map(.x = id, .f = function(.x){
       sample_n(Prob,  size = 1, weight = Prob) }))
@@ -301,7 +301,6 @@ Find_Summary <- function(daily_by_season){
 
 
 
-# Organizar desde esta parte... 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
 # 4. Resampling
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
@@ -332,8 +331,6 @@ resampling <-  function(data, CPT_prob, year_forecast){
     unnest %>% 
     arrange(year)
   
-  
-  
   # data %>% 
   #   mutate(date = mdy(glue::glue('{month}-{day}-{year}'))) %>% 
   #   filter(year == '2010')  %>% 
@@ -343,9 +340,6 @@ resampling <-  function(data, CPT_prob, year_forecast){
   #                limits = c(as.Date('2010-01-01'), as.Date('2010-12-31'))) +
   #   labs(x = NULL, y = 'Precipitación (mm)') + 
   #   theme_bw()
-  
-  
-  
   
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= 
   # =-=-=-=-=  Do years (start year and end year)...
@@ -362,8 +356,7 @@ resampling <-  function(data, CPT_prob, year_forecast){
     slice(n()) %>% 
     as.numeric()
   
-  
-  
+
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   # 2. Organize Probability, monthly data and daily data. 
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -517,8 +510,7 @@ function_to_save <- function(station, Esc_all, path_out){
     unnest %>% 
     write_csv(., path = glue::glue('{path_out}{station}/Escenario_A.csv'))
   
-  
-  
+ 
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   # summary variables files creation.
   Levels <- Esc_C %>% 
@@ -545,7 +537,6 @@ function_to_save <- function(station, Esc_all, path_out){
     ungroup()
   
   
-  
   summaries <- summaries %>% 
     gather(variable, values, -month, -year) %>% 
     nest(-variable) %>% 
@@ -565,36 +556,9 @@ function_to_save <- function(station, Esc_all, path_out){
   # Aqui se guardan los archivos...
   walk2(.x = summaries$data, .y = summaries$file_name,
         .f = function(.x, .y){write_csv(x = .x, path = .y)})
-  
 }
 
                                           
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=
-###  Run from here results.
-
-
-# Read daily data: 
-Cerete <- readr::read_csv("Resampling/daily_preliminar/Cerete.csv")
-Prob <- readr::read_csv("Resampling/CPT_prob/Cerete1_prob_precip.csv")
-
-# year ...  necesito que identifique el sistema si el año es bisiesto. 
-year_forecast <- Sys.Date() %>% year()
-
-
-CPT_prob <- Prob %>%
-  .[,c(1, 4)] %>%
-  set_names('NDJ', 'FMA') %>%
-  mutate(Type = c('Below', 'Normal', 'Above')) %>%
-  gather(Season, Prob, -Type)
-
-
-
-# We are testing only for one file... but the idea it's have the other files 
-# and put the results in a specific folder. 
-# cerete <- resampling(data = Cerete, CPT_prob = CPT_prob, 
-#            year_forecast = year_forecast)
 
 
 
@@ -612,8 +576,15 @@ CPT_prob <- Prob %>%
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 # Read daily data: 
-Cerete <- readr::read_csv("Resampling/daily_preliminar/Cerete.csv")
+# Cerete <- readr::read_csv("Resampling/daily_preliminar/Cerete.csv")
 Prob <- readr::read_csv("Resampling/CPT_prob/Cerete1_prob_precip.csv")
+
+CPT_prob <- Prob %>%
+  .[,c(1, 4)] %>%
+  set_names('NDJ', 'FMA') %>%
+  mutate(Type = c('Below', 'Normal', 'Above')) %>%
+  gather(Season, Prob, -Type)
+
 
 # year ...  necesito que identifique el sistema si el año es bisiesto. 
 year_forecast <- Sys.Date() %>% year()
@@ -633,7 +604,8 @@ Initial_data <- tibble(names = list.files(Path_stations) %>% str_remove('.csv'),
 
 
 
-#  Transformar esta parte es posible que se necesite cambiarla... dependiendo de la reunion. 
+#  Transformar esta parte es posible que se necesite cambiarla... dependiendo de la reunion.
+#  Transforming this part may need to be changed ...
 Initial_data <- Initial_data %>% 
   mutate(CPT_prob = purrr::map(.x = CPT_prob, .f = function(.x){
     Prov <- .x %>% .[,c(1, 4)] %>% set_names('NDJ', 'FMA') %>%
@@ -652,9 +624,6 @@ tictoc::toc() # 16.55 -- less than one minute.
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 path_out <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/results/'
 
 
@@ -667,7 +636,9 @@ purrr::map2(.x = Resam$names, .y = Resam$Escenaries,
 
 
 
-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
 # .------..------..------..------..------..------..------..------..------..------.
@@ -701,7 +672,7 @@ download_data_chirp <- function(ini.date, end.date, year_to, path_Chirp){
   purrr::map2(.x = urls, .y = path_Chirp_all, .f = download.file)
   tictoc::toc() # 84.12 seg.
   
-  return("Datos de CHIRPS descargados!") }
+  return("CHIRPS data downloaded!") }
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -709,10 +680,10 @@ download_data_chirp <- function(ini.date, end.date, year_to, path_Chirp){
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 # INPUT
-# lat: latitud de la estaciÃ³n/sitio de interÃ©s
-# lon: longitud de la estaciÃ³n/sitio de interÃ©s
-# year_to: actual year
-# month_to: actual month
+# lat: latitude of the station / site of interest.
+# lon: longitud of the station / site of interest.
+# year_to: actual year.
+# month_to: actual month.
 
 # =-=-=-=-=
 # Testing this parth 
@@ -769,8 +740,6 @@ download_data_nasa <- function(data, special_data){
            srad = ifelse(is.na(srad), mean(srad, na.rm = TRUE), srad))
   
   return(nasa_data_dw)}
-
-
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -845,43 +814,11 @@ function_replace <- function(data, path){
 }
 
 
-
-
-
-# Run for one station NASA-POWER download. 
-
-
-lat <- 4.53
-lon <- -76.06	
-
-# In this part we define year_to and month_to...
-if (substring(Sys.Date(),6,7) == "01"){
-  year_to = as.numeric(format(Sys.Date(),"%Y"))-1
-  month_to = 12
-} else {
-  year_to = format(Sys.Date(),"%Y")
-  month_to = as.numeric(format(Sys.Date(),"%m"))-1
-}
-
-
-data <- Cerete
-special_data <- tibble(lat, lon, year_to, month_to)
-
-rm(lon, lat, month_to)
-
-
-# tictoc::tic()
-# nasa_data <- download_data_nasa(Cerete, special_data)
-# tictoc::toc()
-
-
-
 #---------------------------------------------------------------------------------#
 #---------------- From this point we download data. ------------------------------#
 #---------------------------------------------------------------------------------#
 
-
-# Por ahora no modificar. 
+# For now don't modify.
 numberOfDays <- function(date) {
   m <- format(date, format="%m")
   
@@ -892,8 +829,7 @@ numberOfDays <- function(date) {
   return(as.integer(format(date - 1, format="%d")))
 }
 
-
-# Creo que esto es para arreglar diciembre...
+# I guess this is for fix december...
 if (substring(Sys.Date(),6,7) == "01"){
   substr_month <- "12"
   substr_year <- year(Sys.Date()) - 1
@@ -909,6 +845,7 @@ end.date <- paste0(substr_year,"-",substr_month,"-",numberOfDays(ini.date)) %>% 
 
 path_Chirp <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/Chirps'
 
+# =-=-= Warning! this part have problems when generate tif. 
 # Hay que revisar como esta funcionando 
 tictoc::tic()
 download_data_chirp(ini.date, end.date, year_to, path_Chirp)
@@ -927,12 +864,11 @@ if (substring(Sys.Date(),6,7) == "01"){
   month_to = as.numeric(format(Sys.Date(),"%m"))-1
 }
 
-
 lat_lon <- read_csv('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Resampling/coordenadas.csv')
 
+# =-=-=-= 
 
-# =-=-=-= Organizar desde aqui... 
-
+tictoc::tic()
 data_to_replace <- Initial_data %>% 
   dplyr::select(names) %>% 
   mutate(path = paste0(path_out, names), year_to, month_to) %>% 
@@ -944,7 +880,7 @@ data_to_replace <- Initial_data %>%
   dplyr::select(-stations, -data) %>% 
     mutate(path = paste0(path_out, names),
            complete_data = purrr::map2(.x = path, .y = satellite_data, .f = complete_data))
-
+tictoc::toc() # 3(177.08 sec) min 
 
 walk2(.x = data_to_replace$complete_data, .y = data_to_replace$path, .f = function_replace)
 
