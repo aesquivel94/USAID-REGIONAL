@@ -932,25 +932,8 @@ lat_lon <- read_csv('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/R
 
 
 # =-=-=-= Organizar desde aqui... 
-# tictoc::tic()
-# month_satel <- Join_extract(Cerete, special_data, path_Chirp)
-# tictoc::toc() # 26.03 seg
-# 
-# 
-# special_data <- tibble(lat = 4.53, lon = -76.06	, year_to, month_to)
-# # data <- Cerete
 
-
-# jmm <- Resam %>%
-#   dplyr::select(names) %>% 
-#   mutate(path = paste0(path_out, names), 
-#          complete_data = purrr::map(.x = path, .f = complete_data))
-
-# walk2(.x = jmm$complete_data, .y = jmm$path,
-#       .f = function_replace)
-
-
-jmm <- Initial_data %>% 
+data_to_replace <- Initial_data %>% 
   dplyr::select(names) %>% 
   mutate(path = paste0(path_out, names), year_to, month_to) %>% 
   right_join(., lat_lon) %>% 
@@ -958,6 +941,13 @@ jmm <- Initial_data %>%
   right_join(., Initial_data) %>% 
   dplyr::select(-CPT_prob) %>% 
   mutate(satellite_data = purrr::map2(.x = stations, .y = data, .f = Join_extract, path_Chirp)) %>% 
-  dplyr::select(-stations, -data) 
+  dplyr::select(-stations, -data) %>% 
+    mutate(path = paste0(path_out, names),
+           complete_data = purrr::map2(.x = path, .y = satellite_data, .f = complete_data))
 
-# Falta correr complete_data... revisar... y ya se terminaría esta parte... 
+
+walk2(.x = data_to_replace$complete_data, .y = data_to_replace$path, .f = function_replace)
+
+
+
+
