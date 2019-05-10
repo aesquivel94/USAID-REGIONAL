@@ -1,7 +1,7 @@
 rm(list = ls()); gc(reset = TRUE)
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Made by:     Alejandra Esquivel Arias. 
-# Created in:  Date: 3-2019
+# Created in:  Date: 5-2019
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Canícula (Midsummer Drought) Methodology.
 
@@ -1432,7 +1432,7 @@ year_1982 <- new_JointCS %>%
   filter(row_number() == 1) %>% 
   dplyr::select(station_N, Lon,  Lat, data) %>% 
   unnest %>% 
-  filter(year == 1984) %>% 
+  filter(year == 1982) %>% 
   rename(id = 'station_N' ) %>% 
   dplyr::select(id, Lon, Lat, day, month, year, date, julian, mov)
 
@@ -1459,8 +1459,6 @@ julian <- year_1982_f %>%
   .$julian
 
 dif <- (julian[2] + julian[1])/2
-
-
 
 
 
@@ -1523,7 +1521,7 @@ ideas_try <- year_pixel %>%
 
 
 ideas_try %>% 
-  filter(between(month, 5, 9)) %>%
+  filter(between(month, 5, 8)) %>%
   slice(1, n()) %>% 
   pull(julian)
 
@@ -1543,7 +1541,7 @@ ideas_try %>%
 
 
 may_sep <- ideas_try %>% 
-  filter(between(month, 5, 9)) %>% 
+  filter(between(month, 5, 8)) %>% 
   mutate(Local_Tts = case_when(
     lag(mov_ts) > mov_ts & lead(mov_ts) > mov_ts ~ 1, 
     lead(mov_ts) < mov_ts & lag(mov_ts) < mov_ts ~ 2,
@@ -1571,20 +1569,94 @@ may_sep %>%
 
 
 
+##############################################################################
+
+
+pereshita <- function(year_to){
+  # Testing other methodologies
+  year_pixel <-  filter(dr, year == year_to) %>% 
+    dplyr::select(station_N, Lon , Lat ,day, month , year, julian, prec_C)
+  # mutate(mov =  movavg(x = prec_C, n = 31, type = 't'))
+  
+  rain <- HoltWinters(year_pixel$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1] 
+  # rainseriesforecasts <- HoltWinters(rainfall, beta=FALSE, gamma=FALSE)
+  
+  ideas_try <- year_pixel %>%
+    mutate(mov =  movavg(x = prec_C, n = 31, type = 't'), ts = c(0,rain), 
+           mov_ts = movavg(x = ts, n = 31, type = 't')) %>% 
+    dplyr::select(-prec_C)
+  
+  
+  jmm <- ideas_try %>% 
+    filter(month %in% 5:8) %>% 
+    dplyr::select(julian, mov_ts) %>% 
+    mutate(type = case_when(
+      lag(mov_ts) > mov_ts & lead(mov_ts) > mov_ts ~ 1, 
+      lead(mov_ts) < mov_ts & lag(mov_ts) < mov_ts ~ 2,
+      TRUE ~ 0  ) ) 
+  
+return(jmm)}
+
+
+jmm <- pereshita(year_to = 1994)
+
+max <- filter(jmm, type == 2)
+
+min <- filter(jmm, type == 1) %>% 
+  # mutate(testing = ifelse(julian < max$julian[1], 1, 0)) %>% 
+  mutate(testing = case_when( 
+    julian < max$julian[1] ~ 1,
+    julian > last(max$julian) ~ 2,
+    TRUE ~ 0)) %>% 
+  filter(testing ==  0)
+
+jmm %>% # filter(julian < 200) %>% 
+  ggplot(aes(julian, mov_ts)) +
+  geom_line(colour ='pink') + 
+  geom_point() +
+  geom_vline(xintercept = min$julian, col = 'red') +
+  geom_vline(xintercept = max$julian, col = 'blue') +
+  theme_bw()
+
+
+
+
+
+
+ 
+# acf(jmm$mov_ts)
+# pacf(jmm$mov_ts)
+
+# library(tibbletime)
+# library(dplyr)
+# library(tidyr)
+# 
+# rollify_max_10 <- tibbletime::rollify(.f = max, window = 7)
+# 
+# jmm %>% 
+#   dplyr::select(julian, mov_ts) %>% 
+#   mutate(see = rollify_max_10(mov_ts))
+
+
+
+
+
+
+
 ## 
-library(zoo)
-x.Date <- as.Date(paste(2004, rep(1:4, 4:1), sample(1:28, 10), sep = "-"))
-x <- zoo(rnorm(12), x.Date)
-
-rollmean(x, 3)
-rollmax(x, 3)
-rollmedian(x, 3)
-
-xm <- zoo(matrix(1:12, 4, 3), x.Date[1:4])
-rollmean(xm, 3)
-rollmax(x, 1) %>% length()
-rollmedian(xm, 3)
-
-rapply(xm, 3, mean) # uses rollmean
-rapply(xm, 3, function(x) mean(x)) # does not use rollmean
+# library(zoo)
+# x.Date <- as.Date(paste(2004, rep(1:4, 4:1), sample(1:28, 10), sep = "-"))
+# x <- zoo(rnorm(12), x.Date)
+# 
+# rollmean(x, 3)
+# rollmax(x, 3)
+# rollmedian(x, 3)
+# 
+# xm <- zoo(matrix(1:12, 4, 3), x.Date[1:4])
+# rollmean(xm, 3)
+# rollmax(x, 1) %>% length()
+# rollmedian(xm, 3)
+# 
+# rapply(xm, 3, mean) # uses rollmean
+# rapply(xm, 3, function(x) mean(x)) # does not use rollmean
 
