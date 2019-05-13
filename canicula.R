@@ -1096,10 +1096,6 @@ choluteca %>%
   geom_vline( xintercept = as.numeric(as.Date("2017-05-01")), linetype=4, colour = 'blue') +
   geom_vline( xintercept = as.numeric(as.Date("2017-09-01")), linetype=4, colour = 'blue')
   
-  
-
-
-
 
 # row_test <- test %>% 
 #   filter(row_number() == 300) 
@@ -1448,7 +1444,7 @@ names(year_1982)
 
 
 year_1982_f <- year_1982 %>% 
-  filter(between(month, 5, 9)) 
+  filter(between(month, 5, 8)) 
 
 
 
@@ -1589,17 +1585,18 @@ pereshita <- function(year_to){
   
   jmm <- ideas_try %>% 
     filter(month %in% 5:8) %>% 
-    dplyr::select(julian, mov_ts) %>% 
+    dplyr::select(julian, month, mov_ts) %>% 
     mutate(type = case_when(
-      lag(mov_ts) > mov_ts & lead(mov_ts) > mov_ts ~ 1, 
-      lead(mov_ts) < mov_ts & lag(mov_ts) < mov_ts ~ 2,
-      TRUE ~ 0  ) ) 
-  
+      lag(mov_ts) - mov_ts > 0  & lead(mov_ts) - mov_ts > 0  ~ 1, 
+      lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
+      TRUE ~ 0  ) )  
 return(jmm)}
 
 
 jmm <- pereshita(year_to = 1994)
 
+
+# Paso1 
 max <- filter(jmm, type == 2)
 
 min <- filter(jmm, type == 1) %>% 
@@ -1610,32 +1607,90 @@ min <- filter(jmm, type == 1) %>%
     TRUE ~ 0)) %>% 
   filter(testing ==  0)
 
+
+# 1995 - 1996
+
+
+#  Paso 2. 
+prim <- max %>% 
+  arrange(desc(mov_ts)) %>% 
+  slice(1)
+
+
+
+
 jmm %>% # filter(julian < 200) %>% 
   ggplot(aes(julian, mov_ts)) +
   geom_line(colour ='pink') + 
   geom_point() +
   geom_vline(xintercept = min$julian, col = 'red') +
   geom_vline(xintercept = max$julian, col = 'blue') +
+  geom_vline(xintercept = prim$julian, col = 'black') +
   theme_bw()
 
 
+# Paso 3. Encontrar los minimos... posibles. 
+# En esta parte se pueden encontrar dos posibles situaciones, cuando este es el min despues. 
+
+# Si es el inicio...
+
+min_after <- min %>% 
+  filter(julian > prim$julian)
+
+
+# Si es el final de la canicula. 
+min_before <- min %>% 
+  filter(julian < prim$julian)
+
+
+tuturu <- bind_rows(min_before, max) %>%
+  dplyr::select(-testing) %>%
+  arrange(julian)
+
+
+# count(max) - 1
+
+
+tuturu %>%
+  mutate(sub = mov_ts - lag(mov_ts), 
+         sub1 = mov_ts - lag(mov_ts, n = 2L)) %>% 
+  filter(type == 1) %>% 
+  
+  
+  
+  
+  
+  mutate(min = min(sub, sub1,  na.rm = T))
+  
+  
 
 
 
-
- 
-# acf(jmm$mov_ts)
-# pacf(jmm$mov_ts)
-
-# library(tibbletime)
-# library(dplyr)
-# library(tidyr)
+# subs <- function(max, min){
+#   dif <- max - min
+# return(dif)}
+#  
+# max_test <- max %>% 
+#   filter(julian < prim$julian)
 # 
-# rollify_max_10 <- tibbletime::rollify(.f = max, window = 7)
+# max_test
+# min
+
+
+
+subs(max_test$mov_ts[1], min$mov_ts[1])
+subs(max_test$mov_ts[1], min$mov_ts[2])
+subs(max_test$mov_ts[2], min$mov_ts[2])
+
+
+
+# Se resta ... también los días julianos... a ver... trata de pensar...
+# sub <- function(max_un, all_min){
+#   all_min <- min
+#   max_un <- max_test$mov_ts[1]
+#   
 # 
-# jmm %>% 
-#   dplyr::select(julian, mov_ts) %>% 
-#   mutate(see = rollify_max_10(mov_ts))
+# }
 
 
 
@@ -1643,20 +1698,8 @@ jmm %>% # filter(julian < 200) %>%
 
 
 
-## 
-# library(zoo)
-# x.Date <- as.Date(paste(2004, rep(1:4, 4:1), sample(1:28, 10), sep = "-"))
-# x <- zoo(rnorm(12), x.Date)
-# 
-# rollmean(x, 3)
-# rollmax(x, 3)
-# rollmedian(x, 3)
-# 
-# xm <- zoo(matrix(1:12, 4, 3), x.Date[1:4])
-# rollmean(xm, 3)
-# rollmax(x, 1) %>% length()
-# rollmedian(xm, 3)
-# 
-# rapply(xm, 3, mean) # uses rollmean
-# rapply(xm, 3, function(x) mean(x)) # does not use rollmean
+  
+
+
+
 
