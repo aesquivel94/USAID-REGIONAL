@@ -1593,47 +1593,102 @@ pereshita <- function(year_to){
 return(jmm)}
 
 
-jmm <- pereshita(year_to = 2011)
-
-# Paso1 
-max <- filter(jmm, type == 2)
-
-min <- filter(jmm, type == 1) %>% 
-  # mutate(testing = ifelse(julian < max$julian[1], 1, 0)) %>% 
-  mutate(testing = case_when( 
-    julian < max$julian[1] ~ 1,
-    julian > last(max$julian) ~ 2,
-    TRUE ~ 0)) %>% 
-  filter(testing ==  0)
-
-# 1995 - 1996
-
-#  Paso 2. 
-prim <- max %>% 
-  arrange(desc(mov_ts)) %>% 
-  slice(1)
-
-# jmm %>% # filter(julian < 200) %>% 
-#   ggplot(aes(julian, mov_ts)) +
-#   geom_line(colour ='pink') + 
-#   geom_point() +
-#   geom_vline(xintercept = min$julian, col = 'red') +
-#   geom_vline(xintercept = max$julian, col = 'blue') +
-#   geom_vline(xintercept = prim$julian, col = 'black') +
-#   theme_bw()
-
-
-# Paso 3. Encontrar los minimos... posibles. 
-# En esta parte se pueden encontrar dos posibles situaciones, cuando este es el min despues. 
-
-# Si es el inicio...
-
-min_after <- min %>% 
-  filter(julian > prim$julian)
+jmm <- pereshita(year_to = 1991)
 
 
 
+# I guess this function should be the final function with all MSD types. 
+define_type_data <- function(data){
+  data <- jmm
+  
+  # First step: define general local maximum and 
+  # filter minimums that do not have a maximum next or before.
+  
+  #Note: I think it's important compute time series maximum and include if that is possible.
+  
+  # Compute 
+  max <- filter(data, type == 2)
+  
+  # For Now we don't use this information on next step. 
+  max_G <- filter(data, row_number() == which.max(data$mov_ts))
+  
+  
+  min <- filter(data, type == 1) %>% 
+    mutate(testing = case_when( 
+      julian < max$julian[1] ~ 1,
+      julian > last(max$julian) ~ 2,
+      TRUE ~ 0)) %>%
+    filter(testing ==  0)
+  
+  #  Paso 2. 
+  GL_max <- max %>% 
+    arrange(desc(mov_ts)) %>% 
+    slice(1)
+  
+  
+  # Here we will do step 3. The idea it's run after_canicula function. 
+  canicula_after(local_max, mins, maxs){
+    
+    # local_max <- GL_max; mins <- min; maxs <- max
+   
+    # Step 3. Find the minimum ... possible.
+    # In this part you can find two possible situations, when this is the min afterwards.
+    
+    # If it's the beginning ...
+    
+    # This computes all possible local min after general local max. 
+    min_after <- mins %>% 
+      filter(julian > local_max$julian)
+  
+    
+    base_filter_Ind <- bind_rows(min_after, max) %>%
+      dplyr::select(-testing) %>%
+      arrange(julian)
+    
+    
+    nrow_base <- nrow(base_filter_Ind)
+    
+    
+    # Aqui es donde hay que hacer una
+    # funcion para que halle cuantas veces debe repetir ese proceso.
+    
+    min_after <- base_filter_Ind %>%
+      filter(row_number() > 1) %>% 
+      mutate(sub1L = mov_ts - lead(mov_ts), 
+             sub2L = mov_ts - lead(mov_ts, n = 2L)) %>% 
+      filter(type == 1) %>% 
+      gather(type, value, -julian, -month, -mov_ts, -type) %>% 
+      arrange(value) %>% 
+      slice(1)
+    
+    
+    second_max <-  maxs %>% 
+      filter(julian > min_after$julian) %>% 
+      mutate(num = paste0( 'sub', 1:nrow(.), 'L')) %>% 
+      filter(num == min_after$type)
+  
+  }
+  
+  
+}
 
+
+
+
+
+
+jmm %>% # filter(julian < 200) %>% 
+  ggplot(aes(julian, mov_ts)) +
+  geom_line(colour ='pink') + 
+  geom_point() +
+  geom_vline(xintercept = min$julian, col = 'red') +
+  geom_vline(xintercept = max$julian, col = 'blue') +
+  geom_vline(xintercept = prim$julian, col = 'black') +
+  geom_vline(xintercept = min_after$julian, col = 'pink') +
+  geom_vline(xintercept = second_max$julian, col = 'gray') +
+  theme_bw()
+
+# rm(second_max,min_after, prim)
 
 
 
