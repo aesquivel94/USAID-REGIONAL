@@ -1593,8 +1593,7 @@ pereshita <- function(year_to){
 return(jmm)}
 
 
-jmm <- pereshita(year_to = 1994)
-
+jmm <- pereshita(year_to = 2011)
 
 # Paso1 
 max <- filter(jmm, type == 2)
@@ -1607,26 +1606,21 @@ min <- filter(jmm, type == 1) %>%
     TRUE ~ 0)) %>% 
   filter(testing ==  0)
 
-
 # 1995 - 1996
-
 
 #  Paso 2. 
 prim <- max %>% 
   arrange(desc(mov_ts)) %>% 
   slice(1)
 
-
-
-
-jmm %>% # filter(julian < 200) %>% 
-  ggplot(aes(julian, mov_ts)) +
-  geom_line(colour ='pink') + 
-  geom_point() +
-  geom_vline(xintercept = min$julian, col = 'red') +
-  geom_vline(xintercept = max$julian, col = 'blue') +
-  geom_vline(xintercept = prim$julian, col = 'black') +
-  theme_bw()
+# jmm %>% # filter(julian < 200) %>% 
+#   ggplot(aes(julian, mov_ts)) +
+#   geom_line(colour ='pink') + 
+#   geom_point() +
+#   geom_vline(xintercept = min$julian, col = 'red') +
+#   geom_vline(xintercept = max$julian, col = 'blue') +
+#   geom_vline(xintercept = prim$julian, col = 'black') +
+#   theme_bw()
 
 
 # Paso 3. Encontrar los minimos... posibles. 
@@ -1638,31 +1632,60 @@ min_after <- min %>%
   filter(julian > prim$julian)
 
 
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Desde aquí el maximo general se trata como el final... 
+
+
 # Si es el final de la canicula. 
 min_before <- min %>% 
   filter(julian < prim$julian)
-
 
 tuturu <- bind_rows(min_before, max) %>%
   dplyr::select(-testing) %>%
   arrange(julian)
 
-
 # count(max) - 1
-
-
-tuturu %>%
-  mutate(sub = mov_ts - lag(mov_ts), 
-         sub1 = mov_ts - lag(mov_ts, n = 2L)) %>% 
+# tuturu %>%
+#   mutate(sub1L = mov_ts - lag(mov_ts), 
+#          sub2L = mov_ts - lag(mov_ts, n = 2L)) %>% 
+#   filter(type == 1) %>% 
+#   rowwise() %>% 
+#   mutate(min = min(sub, sub1,  na.rm = T))
+  
+min_b <- tuturu %>%
+  mutate(sub1L = mov_ts - lag(mov_ts), 
+         sub2L = mov_ts - lag(mov_ts, n = 2L)) %>% 
   filter(type == 1) %>% 
-  
-  
-  
-  
-  
-  mutate(min = min(sub, sub1,  na.rm = T))
-  
-  
+  gather(type, value, -julian, -month, -mov_ts, -type) %>% 
+  arrange(value) %>% 
+  slice(1)
+
+# max2 
+first_max <- max %>% 
+  filter(julian < min_b$julian) %>% 
+  mutate(num = paste0( 'sub',rev(1:nrow(.)), 'L')) %>% 
+  filter(num == min_b$type)
+
+jmm %>% # filter(julian < 200) %>% 
+  ggplot(aes(julian, mov_ts)) +
+  geom_line(colour ='pink') + 
+  geom_point() +
+  geom_vline(xintercept = min$julian, col = 'red') +
+  geom_vline(xintercept = max$julian, col = 'blue') +
+  geom_vline(xintercept = prim$julian, col = 'black') +
+  geom_vline(xintercept = min_b$julian, col = 'pink') +
+  geom_vline(xintercept = first_max$julian, col = 'gray') +
+  theme_bw()
+
+rm(first_max,min_b, prim)
+
+
 
 
 
@@ -1678,9 +1701,9 @@ tuturu %>%
 
 
 
-subs(max_test$mov_ts[1], min$mov_ts[1])
-subs(max_test$mov_ts[1], min$mov_ts[2])
-subs(max_test$mov_ts[2], min$mov_ts[2])
+# subs(max_test$mov_ts[1], min$mov_ts[1])
+# subs(max_test$mov_ts[1], min$mov_ts[2])
+# subs(max_test$mov_ts[2], min$mov_ts[2])
 
 
 
