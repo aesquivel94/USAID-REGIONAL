@@ -1593,15 +1593,13 @@ pereshita <- function(year_to){
 return(jmm)}
 
 
-jmm <- pereshita(year_to = 2011)
+jmm <- pereshita(year_to = 1983)
 
-# jmm %>% ggplot(aes(julian, mov_ts)) +
-# geom_line(colour ='pink') + geom_point() + theme_bw()
+jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()
 
 # I guess this function should be the final function with all MSD types. 
-define_type_data <- function(data){
+# define_type_data <- function(data){
   data <- jmm
-  
   # First step: define general local maximum and 
   # filter minimums that do not have a maximum next or before.
   
@@ -1627,16 +1625,13 @@ define_type_data <- function(data){
     arrange(desc(mov_ts)) %>% 
     slice(1)
   
-  
   # Here we will do step 3. The idea it's run after_canicula function. 
-  canicula_after(local_max, mins, maxs){
+  canicula_after <- function(local_max, mins, maxs){
     
-    local_max <- GL_max; mins <- min; maxs <- max
+    # local_max <- GL_max; mins <- min; maxs <- max
    
     # Step 3. Find the minimum ... possible.
     # In this part you can find two possible situations, when this is the min afterwards.
-    
-    # If it's the beginning ...
     
     # This computes all possible local min after general local max. 
     min_after <- mins %>% 
@@ -1649,21 +1644,12 @@ define_type_data <- function(data){
     
     # Calcular el número de filas... que tiene el conjunto...
     nrow_base <- nrow(min_after)
-    
-    
-    # Aqui es donde hay que hacer una
-    # funcion para que halle cuantas veces debe repetir ese proceso.
-    # No puede ser par osea 2nL porque sino resta los iguales.
-    
-    # Por ahora funciona pero hay que hacer una función
-    # que agregue la cantidad necesaria de mutates o simplemente un for...
-
-    
-    # Haciendo el arreglo o trampa para que agregue los mutates. 
   
+    # Haciendo el arreglo o trampa para que agregue los mutates. 
     min_after <- base_filter_Ind %>%
       filter(row_number() > 1) 
-
+    
+    # En esta parte se estan adicionando los mutate. 
     j <- 1 
     for(i in 1:nrow_base){
       # print(i) ; print(j)
@@ -1678,7 +1664,7 @@ define_type_data <- function(data){
     }
     
     
-  
+    # Aqui se extrae el segundo maximo. 
     min_after <- min_after %>% 
       filter(type == 1)  %>% 
       gather(type, value, -julian, -month, -mov_ts, -type) %>% 
@@ -1686,25 +1672,31 @@ define_type_data <- function(data){
       slice(1)
     
     
+    # Listo en esta parte se selecciona el seguno maximo. 
     
-
-    
-    
-    ################
-    ################
-    
-    
-    
-    
-    second_max <-  maxs %>% 
+    second_max <- maxs %>% 
       filter(julian > min_after$julian) %>% 
-      mutate(num = paste0( 'sub', 1:nrow(.), 'L')) %>% 
+      mutate(num = paste0( 'sub', seq(1, (2*(nrow_base-1) + 1), by = 2), 'L')) %>% 
       filter(num == min_after$type)
+    
+    
+    # (2*(1-1) + 1) ; (2*(2-1) + 1) ; (2*(3-1) + 1) ; (2*(4-1) + 1)
+
+    # Aqui hay que crear el objeto  final...
+    canicula_after <- tibble(start_date = local_max$julian, min_date = min_after$julian, 
+           end_date = second_max$julian, length = end_date - start_date)
+    
+  return(canicula_after)}
   
-  }
+  canicula_A <- canicula_after(local_max = GL_max, mins = min, maxs = max)
   
+  print(canicula_A)
+  jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
+    geom_vline(xintercept = as.numeric(canicula_A[1,-4]), col = 'red')
   
-}
+  rm(canicula_A)
+  
+# }
 
 
 
