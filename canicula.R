@@ -1593,9 +1593,10 @@ pereshita <- function(year_to){
 return(jmm)}
 
 
-jmm <- pereshita(year_to = 1991)
+jmm <- pereshita(year_to = 2011)
 
-
+# jmm %>% ggplot(aes(julian, mov_ts)) +
+# geom_line(colour ='pink') + geom_point() + theme_bw()
 
 # I guess this function should be the final function with all MSD types. 
 define_type_data <- function(data){
@@ -1612,7 +1613,8 @@ define_type_data <- function(data){
   # For Now we don't use this information on next step. 
   max_G <- filter(data, row_number() == which.max(data$mov_ts))
   
-  
+  # This line filter minimums local 
+  # when doesn't have local max before or next.  
   min <- filter(data, type == 1) %>% 
     mutate(testing = case_when( 
       julian < max$julian[1] ~ 1,
@@ -1620,7 +1622,7 @@ define_type_data <- function(data){
       TRUE ~ 0)) %>%
     filter(testing ==  0)
   
-  #  Paso 2. 
+  #  Step 2. Compute the max of local_max.
   GL_max <- max %>% 
     arrange(desc(mov_ts)) %>% 
     slice(1)
@@ -1629,7 +1631,7 @@ define_type_data <- function(data){
   # Here we will do step 3. The idea it's run after_canicula function. 
   canicula_after(local_max, mins, maxs){
     
-    # local_max <- GL_max; mins <- min; maxs <- max
+    local_max <- GL_max; mins <- min; maxs <- max
    
     # Step 3. Find the minimum ... possible.
     # In this part you can find two possible situations, when this is the min afterwards.
@@ -1640,26 +1642,58 @@ define_type_data <- function(data){
     min_after <- mins %>% 
       filter(julian > local_max$julian)
   
-    
+    # This line join max with mins in one tibble. 
     base_filter_Ind <- bind_rows(min_after, max) %>%
       dplyr::select(-testing) %>%
       arrange(julian)
     
-    
-    nrow_base <- nrow(base_filter_Ind)
+    # Calcular el número de filas... que tiene el conjunto...
+    nrow_base <- nrow(min_after)
     
     
     # Aqui es donde hay que hacer una
     # funcion para que halle cuantas veces debe repetir ese proceso.
+    # No puede ser par osea 2nL porque sino resta los iguales.
     
+    # Por ahora funciona pero hay que hacer una función
+    # que agregue la cantidad necesaria de mutates o simplemente un for...
+
+    
+    # Haciendo el arreglo o trampa para que agregue los mutates. 
+  
     min_after <- base_filter_Ind %>%
-      filter(row_number() > 1) %>% 
-      mutate(sub1L = mov_ts - lead(mov_ts), 
-             sub2L = mov_ts - lead(mov_ts, n = 2L)) %>% 
-      filter(type == 1) %>% 
+      filter(row_number() > 1) 
+
+    j <- 1 
+    for(i in 1:nrow_base){
+      # print(i) ; print(j)
+      
+      cat(glue::glue('(i = {i} ; j = {j}) '))
+      varname <- glue::glue('sub{j}L')
+      
+      min_after <- min_after %>% 
+            mutate(!!varname := mov_ts - lead(mov_ts, n = j)) 
+      
+      j <-  (2*i) + 1
+    }
+    
+    
+  
+    min_after <- min_after %>% 
+      filter(type == 1)  %>% 
       gather(type, value, -julian, -month, -mov_ts, -type) %>% 
       arrange(value) %>% 
       slice(1)
+    
+    
+    
+
+    
+    
+    ################
+    ################
+    
+    
     
     
     second_max <-  maxs %>% 
@@ -1671,8 +1705,6 @@ define_type_data <- function(data){
   
   
 }
-
-
 
 
 
@@ -1739,45 +1771,3 @@ jmm %>% # filter(julian < 200) %>%
   theme_bw()
 
 rm(first_max,min_b, prim)
-
-
-
-
-
-# subs <- function(max, min){
-#   dif <- max - min
-# return(dif)}
-#  
-# max_test <- max %>% 
-#   filter(julian < prim$julian)
-# 
-# max_test
-# min
-
-
-
-# subs(max_test$mov_ts[1], min$mov_ts[1])
-# subs(max_test$mov_ts[1], min$mov_ts[2])
-# subs(max_test$mov_ts[2], min$mov_ts[2])
-
-
-
-# Se resta ... también los días julianos... a ver... trata de pensar...
-# sub <- function(max_un, all_min){
-#   all_min <- min
-#   max_un <- max_test$mov_ts[1]
-#   
-# 
-# }
-
-
-
-
-
-
-
-  
-
-
-
-
