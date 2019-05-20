@@ -1499,65 +1499,65 @@ year_1982_f %>%
 
 dr <- read_csv("Drought/dr.csv")
 
-# Testing other methodologies
-year_pixel <-  filter(dr, year == 1989) %>% 
-  dplyr::select(station_N, Lon , Lat ,day, month , year, julian, prec_C)
-# mutate(mov =  movavg(x = prec_C, n = 31, type = 't'))
-
-
-
-rain <- HoltWinters(year_pixel$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1] 
-# rainseriesforecasts <- HoltWinters(rainfall, beta=FALSE, gamma=FALSE)
-
-ideas_try <- year_pixel %>%
-  mutate(mov =  movavg(x = prec_C, n = 31, type = 't'), ts = c(0,rain), 
-         mov_ts = movavg(x = ts, n = 31, type = 't')) %>% 
-  dplyr::select(-prec_C)
-
-
-
-ideas_try %>% 
-  filter(between(month, 5, 8)) %>%
-  slice(1, n()) %>% 
-  pull(julian)
-
-
-
-ideas_try %>% 
-  gather(key = var, value = value, -station_N, 
-         -Lon ,-Lat , -day, -month, -year, -julian) %>% 
-  ggplot(aes(x = julian, y = value, colour = var)) +
-  geom_line() + 
-  geom_vline(xintercept = c(121, 273),  color="blue", linetype="dashed", size=1)+
-  facet_wrap(~var, ncol = 3) +
-  labs(x = NULL, Y = 'Precipitation (mm)')+
-  theme_bw() + 
-  theme(legend.position = 'top')  
-
-
-
-may_sep <- ideas_try %>% 
-  filter(between(month, 5, 8)) %>% 
-  mutate(Local_Tts = case_when(
-    lag(mov_ts) > mov_ts & lead(mov_ts) > mov_ts ~ 1, 
-    lead(mov_ts) < mov_ts & lag(mov_ts) < mov_ts ~ 2,
-    TRUE ~ 0  ) ) 
-
-max <-  may_sep %>% 
-  filter(Local_Tts == 1) %>% 
-  pull(julian)
-
-
-min <- may_sep %>% 
-  filter(Local_Tts == 2) %>% 
-  pull(julian)
-
-may_sep %>% 
-  ggplot(aes(x = julian, y = mov_ts)) + 
-  geom_line() + 
-  geom_vline(xintercept = min, color = 'blue', linetype="dashed", size=1) + 
-  geom_vline(xintercept = max, color = 'red', linetype="dashed", size=1) +
-  theme_bw()
+# # Testing other methodologies
+# year_pixel <-  filter(dr, year == 1989) %>% 
+#   dplyr::select(station_N, Lon , Lat ,day, month , year, julian, prec_C)
+# # mutate(mov =  movavg(x = prec_C, n = 31, type = 't'))
+# 
+# 
+# 
+# rain <- HoltWinters(year_pixel$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1] 
+# # rainseriesforecasts <- HoltWinters(rainfall, beta=FALSE, gamma=FALSE)
+# 
+# ideas_try <- year_pixel %>%
+#   mutate(mov =  movavg(x = prec_C, n = 31, type = 't'), ts = c(0,rain), 
+#          mov_ts = movavg(x = ts, n = 31, type = 't')) %>% 
+#   dplyr::select(-prec_C)
+# 
+# 
+# 
+# ideas_try %>% 
+#   filter(between(month, 5, 8)) %>%
+#   slice(1, n()) %>% 
+#   pull(julian)
+# 
+# 
+# 
+# ideas_try %>% 
+#   gather(key = var, value = value, -station_N, 
+#          -Lon ,-Lat , -day, -month, -year, -julian) %>% 
+#   ggplot(aes(x = julian, y = value, colour = var)) +
+#   geom_line() + 
+#   geom_vline(xintercept = c(121, 273),  color="blue", linetype="dashed", size=1)+
+#   facet_wrap(~var, ncol = 3) +
+#   labs(x = NULL, Y = 'Precipitation (mm)')+
+#   theme_bw() + 
+#   theme(legend.position = 'top')  
+# 
+# 
+# 
+# may_sep <- ideas_try %>% 
+#   filter(between(month, 5, 8)) %>% 
+#   mutate(Local_Tts = case_when(
+#     lag(mov_ts) > mov_ts & lead(mov_ts) > mov_ts ~ 1, 
+#     lead(mov_ts) < mov_ts & lag(mov_ts) < mov_ts ~ 2,
+#     TRUE ~ 0  ) ) 
+# 
+# max <-  may_sep %>% 
+#   filter(Local_Tts == 1) %>% 
+#   pull(julian)
+# 
+# 
+# min <- may_sep %>% 
+#   filter(Local_Tts == 2) %>% 
+#   pull(julian)
+# 
+# may_sep %>% 
+#   ggplot(aes(x = julian, y = mov_ts)) + 
+#   geom_line() + 
+#   geom_vline(xintercept = min, color = 'blue', linetype="dashed", size=1) + 
+#   geom_vline(xintercept = max, color = 'red', linetype="dashed", size=1) +
+#   theme_bw()
 
 
 
@@ -1566,10 +1566,14 @@ may_sep %>%
 
 
 ##############################################################################
+dr <- read_csv("Drought/dr.csv")
 
 
-pereshita <- function(year_to){
-  # Testing other methodologies
+# This function (curve HoltWinters) summarise the time 
+# filter by year and compute HoltWinters - triangular mean. 
+curve_HoltWinters <- function(year_to){
+  
+  # Testing other methodologies...
   year_pixel <-  filter(dr, year == year_to) %>% 
     dplyr::select(station_N, Lon , Lat ,day, month , year, julian, prec_C)
   # mutate(mov =  movavg(x = prec_C, n = 31, type = 't'))
@@ -1592,14 +1596,12 @@ pereshita <- function(year_to){
       TRUE ~ 0  ) )  
 return(jmm)}
 
-
-# Here we will do step 3. The idea it's run after_canicula function. 
+# Here we will do step 3. 
+# This function find the canicula when the general local maximo is canicula's start.
 canicula_after <- function(local_max, mins, maxs){
-  
   # local_max <- GL_max; mins <- min; maxs <- max
   
   # Step 3. Find the minimum ... possible.
-  # In this part you can find two possible situations, when this is the min afterwards.
   
   # This computes all possible local min after general local max. 
   min_after <- mins %>% 
@@ -1610,14 +1612,14 @@ canicula_after <- function(local_max, mins, maxs){
     dplyr::select(-testing) %>%
     arrange(julian)
   
-  # Calcular el número de filas... que tiene el conjunto...
+  # This line calculate the number of rows... that the dataset has.
   nrow_base <- nrow(min_after)
   
-  # Haciendo el arreglo o trampa para que agregue los mutates. 
+  # making the arrangement or trap to add mutates.
   min_after <- base_filter_Ind %>%
     filter(row_number() > 1) 
   
-  # En esta parte se estan adicionando los mutate. 
+  # add mutates.
   j <- 1 
   for(i in 1:nrow_base){
     # print(i) ; print(j)
@@ -1630,26 +1632,24 @@ canicula_after <- function(local_max, mins, maxs){
     
     j <-  (2*i) + 1 }
   
-  
-  # Aqui se extrae el segundo maximo. 
+  # Here we extract the second local max. 
   min_after <- min_after %>% 
     filter(type == 1)  %>% 
     gather(type, value, -julian, -month, -mov_ts, -type) %>% 
     arrange(value) %>% 
     slice(1)
   
-  
+  # If we find min... do second max and canicula. 
+  # In other case only create canicula with data NA.
   if(nrow(min_after) != 0){
-    # Listo en esta parte se selecciona el seguno maximo. 
+    # Ok this line select the second max.     
     second_max <- maxs %>% 
       filter(julian > min_after$julian) %>% 
       mutate(num = paste0( 'sub', seq(1, (2*(nrow_base-1) + 1), by = 2), 'L')) %>% 
       filter(num == min_after$type)
-    
-    
+
     # (2*(1-1) + 1) ; (2*(2-1) + 1) ; (2*(3-1) + 1) ; (2*(4-1) + 1)
-    
-    # Aqui hay que crear el objeto  final...
+    # Here we create the final object...
     canicula_after <- tibble(start_date = local_max$julian, min_date = min_after$julian, 
                              end_date = second_max$julian, length = end_date - start_date)
   }else{
@@ -1663,23 +1663,20 @@ canicula_before <- function(local_max, mins, maxs){
   # local_max <- GL_max; mins <- min; maxs <- max
   
   
-  # Si es el final de la canicula. 
-  min_before <- min %>% 
+  # Step 4. Find the minimum ... possible. 
+  min_before <- mins %>% 
     filter(julian < local_max$julian)
   
-  # Union de las dos bases de datos, tanto los minimos como los maximos. 
+  # This line join max with mins in one tibble.  
   min_b <- bind_rows(min_before, maxs) %>%
     dplyr::select(-testing) %>%
     arrange(julian)
   
   
-  # Calcular el número de filas... que tiene el conjunto...
+  # This line calculate the number of rows... that the dataset has.
   nrow_base <- nrow(min_before)
   
-  # min_b <- base_filter_Ind %>%
-  #   mutate(sub1L = mov_ts - lag(mov_ts), 
-  #          sub2L = mov_ts - lag(mov_ts, n = 2L))
-  
+  # making the arrangement or trap to add mutates.
   # =-=-=-=-=-=
   j <- 1 
   for(i in 1:nrow_base){
@@ -1694,25 +1691,24 @@ canicula_before <- function(local_max, mins, maxs){
     j <-  (2*i) + 1 }
   
   
-  # Este es el minimo antes del maximo final.
+  # This is the minimum before the final maximum.
   min_b <-  min_b %>% 
     filter(type == 1) %>% 
     gather(type, value, -julian, -month, -mov_ts, -type) %>% 
     arrange(value) %>% 
     slice(1)
   
-  # Aqui se esta creando el objeto final a retornar. 
+  
+  # If we find min... do first max and canicula. 
+  # In other case only create canicula with data NA.
   if(nrow(min_b) != 0){
-    # Listo en esta parte se selecciona el seguno maximo. 
-    # Aquí hay que seguir trabajando...
-    # seq(1, (2*(nrow_base-1) + 1)
-    # max2 
+    
     ini_max <- maxs %>% 
       filter(julian < min_b$julian) %>% 
       mutate(num = paste0( 'sub',rev(1:nrow(.)), 'L')) %>% 
       filter(num == min_b$type)
     
-    # Aqui hay que crear el objeto  final...
+    # Here we create the final object...
     canicula_after <- tibble(start_date = ini_max$julian, min_date = min_b$julian, 
                              end_date = local_max$julian, length = end_date - start_date)
   }else{
@@ -1721,14 +1717,13 @@ canicula_before <- function(local_max, mins, maxs){
   
   return(canicula_after)}
 
-
-jmm <- pereshita(year_to = 2010)
+# jmm <- curve_HoltWinters(year_to = 2010)
 
 # jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()
 
 # I guess this function should be the final function with all MSD types. 
-# define_type_data <- function(data){
-  data <- jmm
+define_two_MSD <- function(data){
+  # data <- jmm
   # First step: define general local maximum and 
   # filter minimums that do not have a maximum next or before.
   
@@ -1738,55 +1733,45 @@ jmm <- pereshita(year_to = 2010)
   max <- filter(data, type == 2)
   
   # For Now we don't use this information on next step. 
-  max_G <- filter(data, row_number() == which.max(data$mov_ts))
+  # max_G <- filter(data, row_number() == which.max(data$mov_ts))
   
   # This line filter minimums local 
   # when doesn't have local max before or next.  
-  min <- filter(data, type == 1) %>% 
-    mutate(testing = case_when( 
+  min <- filter(data, type == 1) %>%
+    mutate(testing = case_when(
       julian < max$julian[1] ~ 1,
       julian > last(max$julian) ~ 2,
       TRUE ~ 0)) %>%
     filter(testing ==  0)
   
   #  Step 2. Compute the max of local_max.
-  GL_max <- max %>% 
-    arrange(desc(mov_ts)) %>% 
+  GL_max <- max %>%
+    arrange(desc(mov_ts)) %>%
     slice(1)
   
   
   # Step 3. Here we will do step 3. The idea it's run after_canicula function. 
   canicula_A <- canicula_after(local_max = GL_max, mins = min, maxs = max)
   
-  print(canicula_A)
-  rm(canicula_A)
-  
-  
   # Step 4. Here we will do step 4. The idea it's run before_canicula function.  
   canicula_B <- canicula_before(local_max = GL_max, mins = min, maxs = max)
 
+  # Step_5. Here we join two MSD. 
+  MSD_two_sides <- bind_rows(canicula_A, canicula_B) %>%
+    mutate(type = c('A', 'B')) %>%
+    dplyr::select(type, start_date, min_date, end_date, length)
   
-  jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
-    geom_vline(xintercept = as.numeric(canicula_B[1,-4]), col = 'red')
-  
-  
-  
- 
+return(MSD_two_sides)}
 
-  
-  
-# }
+
+# jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
+#   geom_vline(xintercept = as.numeric(canicula_B[1,-4]), col = 'red')
 
 
 
 
+jmm <- curve_HoltWinters(year_to = 2010)
 
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# Desde aquí el maximo general se trata como el final... 
-
-
-
-
+define_two_MSD(jmm)
 
 
