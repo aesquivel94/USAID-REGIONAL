@@ -1606,7 +1606,7 @@ canicula_after <- function(local_max, mins, maxs){
     filter(julian > local_max$julian)
   
   # This line join max with mins in one tibble. 
-  base_filter_Ind <- bind_rows(min_after, max) %>%
+  base_filter_Ind <- bind_rows(min_after, maxs) %>%
     dplyr::select(-testing) %>%
     arrange(julian)
   
@@ -1658,10 +1658,71 @@ canicula_after <- function(local_max, mins, maxs){
   
   return(canicula_after)}
 
+# Step 4. Here we will do step 4. The idea it's run before_canicula function.  
+canicula_before <- function(local_max, mins, maxs){
+  # local_max <- GL_max; mins <- min; maxs <- max
+  
+  
+  # Si es el final de la canicula. 
+  min_before <- min %>% 
+    filter(julian < local_max$julian)
+  
+  # Union de las dos bases de datos, tanto los minimos como los maximos. 
+  min_b <- bind_rows(min_before, maxs) %>%
+    dplyr::select(-testing) %>%
+    arrange(julian)
+  
+  
+  # Calcular el número de filas... que tiene el conjunto...
+  nrow_base <- nrow(min_before)
+  
+  # min_b <- base_filter_Ind %>%
+  #   mutate(sub1L = mov_ts - lag(mov_ts), 
+  #          sub2L = mov_ts - lag(mov_ts, n = 2L))
+  
+  # =-=-=-=-=-=
+  j <- 1 
+  for(i in 1:nrow_base){
+    # print(i) ; print(j)
+    
+    cat(glue::glue('(i = {i} ; j = {j}) '))
+    varname <- glue::glue('sub{j}L')
+    
+    min_b <- min_b %>% 
+      mutate(!!varname := mov_ts - lag(mov_ts, n = j)) 
+    
+    j <-  (2*i) + 1 }
+  
+  
+  # Este es el minimo antes del maximo final.
+  min_b <-  min_b %>% 
+    filter(type == 1) %>% 
+    gather(type, value, -julian, -month, -mov_ts, -type) %>% 
+    arrange(value) %>% 
+    slice(1)
+  
+  # Aqui se esta creando el objeto final a retornar. 
+  if(nrow(min_b) != 0){
+    # Listo en esta parte se selecciona el seguno maximo. 
+    # Aquí hay que seguir trabajando...
+    # seq(1, (2*(nrow_base-1) + 1)
+    # max2 
+    ini_max <- maxs %>% 
+      filter(julian < min_b$julian) %>% 
+      mutate(num = paste0( 'sub',rev(1:nrow(.)), 'L')) %>% 
+      filter(num == min_b$type)
+    
+    # Aqui hay que crear el objeto  final...
+    canicula_after <- tibble(start_date = ini_max$julian, min_date = min_b$julian, 
+                             end_date = local_max$julian, length = end_date - start_date)
+  }else{
+    canicula_after <- tibble(start_date = NA, min_date = NA, end_date = NA, length = NA)
+  }
+  
+  return(canicula_after)}
 
 
-
-jmm <- pereshita(year_to = 1994)
+jmm <- pereshita(year_to = 2010)
 
 # jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()
 
@@ -1701,57 +1762,22 @@ jmm <- pereshita(year_to = 1994)
   rm(canicula_A)
   
   
-  # Step 4. Here we will do step 4. The idea it's run after_canicula function.  
+  # Step 4. Here we will do step 4. The idea it's run before_canicula function.  
+  canicula_B <- canicula_before(local_max = GL_max, mins = min, maxs = max)
+
   
-  
-  canicula_before <- function(local_max, mins, maxs){
-    local_max <- GL_max; mins <- min; maxs <- max
-    
-    
-    # Si es el final de la canicula. 
-    min_before <- min %>% 
-      filter(julian < local_max$julian)
-    
-    
-    tuturu <- bind_rows(min_before, max) %>%
-      dplyr::select(-testing) %>%
-      arrange(julian)
-    
-    
-    
-  }
-  
-  
-  
-  
-  
-  # jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
-  #   geom_vline(xintercept = as.numeric(canicula_A[1,-4]), col = 'red')
+  jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
+    geom_vline(xintercept = as.numeric(canicula_B[1,-4]), col = 'red')
   
   
   
  
-  
-  
+
   
   
 # }
 
 
-
-
-jmm %>% # filter(julian < 200) %>% 
-  ggplot(aes(julian, mov_ts)) +
-  geom_line(colour ='pink') + 
-  geom_point() +
-  geom_vline(xintercept = min$julian, col = 'red') +
-  geom_vline(xintercept = max$julian, col = 'blue') +
-  geom_vline(xintercept = prim$julian, col = 'black') +
-  geom_vline(xintercept = min_after$julian, col = 'pink') +
-  geom_vline(xintercept = second_max$julian, col = 'gray') +
-  theme_bw()
-
-# rm(second_max,min_after, prim)
 
 
 
@@ -1760,45 +1786,7 @@ jmm %>% # filter(julian < 200) %>%
 # Desde aquí el maximo general se trata como el final... 
 
 
-# Si es el final de la canicula. 
-min_before <- min %>% 
-  filter(julian < prim$julian)
 
-tuturu <- bind_rows(min_before, max) %>%
-  dplyr::select(-testing) %>%
-  arrange(julian)
 
-# count(max) - 1
-# tuturu %>%
-#   mutate(sub1L = mov_ts - lag(mov_ts), 
-#          sub2L = mov_ts - lag(mov_ts, n = 2L)) %>% 
-#   filter(type == 1) %>% 
-#   rowwise() %>% 
-#   mutate(min = min(sub, sub1,  na.rm = T))
-  
-min_b <- tuturu %>%
-  mutate(sub1L = mov_ts - lag(mov_ts), 
-         sub2L = mov_ts - lag(mov_ts, n = 2L)) %>% 
-  filter(type == 1) %>% 
-  gather(type, value, -julian, -month, -mov_ts, -type) %>% 
-  arrange(value) %>% 
-  slice(1)
 
-# max2 
-first_max <- max %>% 
-  filter(julian < min_b$julian) %>% 
-  mutate(num = paste0( 'sub',rev(1:nrow(.)), 'L')) %>% 
-  filter(num == min_b$type)
 
-jmm %>% # filter(julian < 200) %>% 
-  ggplot(aes(julian, mov_ts)) +
-  geom_line(colour ='pink') + 
-  geom_point() +
-  geom_vline(xintercept = min$julian, col = 'red') +
-  geom_vline(xintercept = max$julian, col = 'blue') +
-  geom_vline(xintercept = prim$julian, col = 'black') +
-  geom_vline(xintercept = min_b$julian, col = 'pink') +
-  geom_vline(xintercept = first_max$julian, col = 'gray') +
-  theme_bw()
-
-rm(first_max,min_b, prim)
