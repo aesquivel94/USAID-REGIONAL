@@ -1767,11 +1767,112 @@ return(MSD_two_sides)}
 # jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
 #   geom_vline(xintercept = as.numeric(canicula_B[1,-4]), col = 'red')
 
+# jmm <- curve_HoltWinters(year_to = 2010)
+# define_two_MSD(jmm)
 
 
 
-jmm <- curve_HoltWinters(year_to = 2010)
+MSD_proof <- tibble(year_to = 1982:2017) %>% 
+  mutate(data = purrr::map(.x = year_to, .f = curve_HoltWinters), 
+         Two_MSD = purrr::map(.x = data, .f = define_two_MSD)) 
 
-define_two_MSD(jmm)
+
+
+# These years don't have MSD... (certain conditions are changed, MSD is found). 
+MSD_proof %>% 
+  dplyr::select(year_to, Two_MSD) %>% 
+  unnest() %>% 
+  filter(year_to %in% c(1995,1996,2001, 2005, 2009))
+
+
+
+######## Aquí hay que revisar en las bases de datos si se 
+######## cumple que los maximos sean mayor que los minimos. 
+########  Hay que hacer unas restas. 
+all_MSD <- MSD_proof %>% 
+  dplyr::select(year_to, Two_MSD) %>% 
+  unnest() %>% 
+  na.omit() 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Years with two MSD. 
+
+Two_MSD <- MSD_proof %>% 
+  # dplyr::select(year_to, Two_MSD) %>% 
+  # unnest() %>% 
+  filter(year_to %in% c(1988,1992,1993,2002,2007,2008))
+
+
+r <- 6
+
+data1 <- MSD_proof  %>% 
+  filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>% 
+  filter(row_number() == r) %>% 
+  dplyr::select(data) %>% 
+  unnest()
+
+MSD1 <- MSD_proof  %>% 
+  filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>% 
+  filter(row_number() == r) %>% 
+  dplyr::select(Two_MSD) %>% 
+  unnest()
+
+data1 %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
+  geom_vline(xintercept = as.numeric(MSD1[1, 2:4]), col = 'red') + 
+  geom_vline(xintercept = as.numeric(MSD1[2, 2:4]), col = 'blue') 
+
+
+
+MSD_0 <- MSD1 %>%
+  dplyr::select(-length) %>% 
+  gather(dates, julian, -type)
+
+
+
+
+
+MSD_0 %>% 
+  # arrange(julian, type) %>% 
+  mutate(mov_ts = purrr::map(.x = julian, .f = function(.x){data1 %>% filter(julian == .x) %>% .$mov_ts}) ) %>% 
+  unnest(mov_ts) %>% 
+  arrange(julian, type)
+
+
+
+
+# ajam <- MSD_0 %>% 
+#   count(julian) %>% 
+#   filter(n < 2) %>% 
+#   .$julian
+# 
+# # select(MSD_0, julian) %>% t() %>% as.numeric()
+# 
+# MSD_0 <- filter(MSD_0, julian %in% ajam)
+# data1 <- filter(data1, julian %in% ajam) 
+# 
+# filter(data1, julian %in% ajam) %>% 
+#    inner_join(MSD_0, ., by = 'julian') %>% 
+#   arrange(julian)
+
+
+
+
+
+
+
+
 
 
