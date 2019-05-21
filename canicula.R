@@ -1764,6 +1764,50 @@ define_two_MSD <- function(data){
 return(MSD_two_sides)}
 
 
+# here we subtract the maximum - minimum of the MSD and then we averaged the differences.
+dif_mean <- function(f){
+  a <- filter(f, dates == 'start_date')$mov_ts
+  b <- filter(f, dates == 'min_date')$mov_ts
+  c <- filter(f, dates == 'end_date')$mov_ts
+  
+  mean_dif <- ((a-b) + (c-b))/2
+  return(mean_dif)}
+
+# This function identify MSD between MSD before and after. 
+One_MSD <- function(MSD1, data){
+  
+  # r <- 6
+  # data1 <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%  
+  #   filter(row_number() == r) %>% dplyr::select(data) %>% unnest()
+  # MSD <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%
+  #   filter(row_number() == r) %>% dplyr::select(Two_MSD) %>% unnest()
+  
+  # data1 %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + 
+  #   theme_bw()+ geom_vline(xintercept = as.numeric(MSD1[1, 2:4]), col = 'red') + 
+  #   geom_vline(xintercept = as.numeric(MSD1[2, 2:4]), col = 'blue') 
+  
+  MSD <- MSD1 %>%
+    dplyr::select(-length) %>% 
+    gather(dates, julian, -type) %>% 
+    mutate(mov_ts = purrr::map(.x = julian, .f = function(.x){data1 %>% filter(julian == .x) %>% .$mov_ts}) ) %>% 
+    unnest(mov_ts)  %>% 
+    nest(-type) %>% 
+    mutate(dif = purrr::map(.x = data, .f = dif_mean)) %>% 
+    unnest(dif) %>% 
+    arrange(desc(dif)) %>% 
+    filter(row_number() == 1)
+  
+  return(MSD)}
+
+
+
+
+
+
+
+
+
+
 # jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
 #   geom_vline(xintercept = as.numeric(canicula_B[1,-4]), col = 'red')
 
@@ -1802,53 +1846,42 @@ all_MSD <- MSD_proof %>%
 # Por ahora dejare el promedio de las diferencias como 
 # Years with two MSD. 
 
-Two_MSD <- MSD_proof %>% 
-  # dplyr::select(year_to, Two_MSD) %>% 
-  # unnest() %>% 
+# Two_MSD <- 
+MSD_proof %>%
+  # dplyr::select(year_to, Two_MSD) %>%
+  # unnest() %>%
   filter(year_to %in% c(1988,1992,1993,2002,2007,2008))
 
 
-r <- 6
-
-data1 <- MSD_proof  %>% 
-  filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>% 
-  filter(row_number() == r) %>% 
-  dplyr::select(data) %>% 
-  unnest()
-
-MSD1 <- MSD_proof  %>% 
-  filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>% 
-  filter(row_number() == r) %>% 
-  dplyr::select(Two_MSD) %>% 
-  unnest()
-
-data1 %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
-  geom_vline(xintercept = as.numeric(MSD1[1, 2:4]), col = 'red') + 
-  geom_vline(xintercept = as.numeric(MSD1[2, 2:4]), col = 'blue') 
 
 
 
-MSD_0 <- MSD1 %>%
-  dplyr::select(-length) %>% 
-  gather(dates, julian, -type)
 
-MSD_0 <- MSD_0 %>% 
-  # arrange(julian, type) %>% 
-  mutate(mov_ts = purrr::map(.x = julian, .f = function(.x){data1 %>% filter(julian == .x) %>% .$mov_ts}) ) %>% 
-  unnest(mov_ts) 
+# Revisar esta parte porque no esta devolviendo bien los resultados. 
 
-dif_mean <- function(f){
-  a <- filter(f, dates == 'start_date')$mov_ts
-  b <- filter(f, dates == 'min_date')$mov_ts
-  c <- filter(f, dates == 'end_date')$mov_ts
+MSD_proof1 <- MSD_proof %>% 
+  mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>% 
+  unnest(proof) %>% 
+  filter(proof == 2) %>% 
+  mutate(Two_MSD = purrr::map2(.x = Two_MSD, .y = data,.f = One_MSD)) %>% 
+  dplyr::select(year_to, Two_MSD) %>% 
+  unnest %>% 
+  dplyr::select(year_to, type)
   
-  mean_dif <- ((a-b) + (c-b))/2
-return(mean_dif)}
 
-MSD_0 %>% 
-  nest(-type) %>% 
-  mutate(dif = purrr::map(.x = data, .f = dif_mean)) %>% 
-  unnest(dif) %>% 
-  arrange(desc(dif)) %>% 
-  filter(row_number() == 1)
+
+MSD_proof %>% 
+  dplyr::select(year_to, Two_MSD) %>%
+  unnest %>% 
+  filter(year_to %in% MSD_proof1$year_to, type == MSD_proof1$type )
+
+
+
+
+MSD_proof %>% 
+  mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>% 
+  unnest(proof)  %>% 
+  dplyr::select(year_to, Two_MSD) %>% 
+  unnest
+
 
