@@ -1799,15 +1799,7 @@ all_MSD <- MSD_proof %>%
 
 
 
-
-
-
-
-
-
-
-
-
+# Por ahora dejare el promedio de las diferencias como 
 # Years with two MSD. 
 
 Two_MSD <- MSD_proof %>% 
@@ -1840,39 +1832,23 @@ MSD_0 <- MSD1 %>%
   dplyr::select(-length) %>% 
   gather(dates, julian, -type)
 
-
-
-
-
-MSD_0 %>% 
+MSD_0 <- MSD_0 %>% 
   # arrange(julian, type) %>% 
   mutate(mov_ts = purrr::map(.x = julian, .f = function(.x){data1 %>% filter(julian == .x) %>% .$mov_ts}) ) %>% 
-  unnest(mov_ts) %>% 
-  arrange(julian, type)
+  unnest(mov_ts) 
 
+dif_mean <- function(f){
+  a <- filter(f, dates == 'start_date')$mov_ts
+  b <- filter(f, dates == 'min_date')$mov_ts
+  c <- filter(f, dates == 'end_date')$mov_ts
+  
+  mean_dif <- ((a-b) + (c-b))/2
+return(mean_dif)}
 
-
-
-# ajam <- MSD_0 %>% 
-#   count(julian) %>% 
-#   filter(n < 2) %>% 
-#   .$julian
-# 
-# # select(MSD_0, julian) %>% t() %>% as.numeric()
-# 
-# MSD_0 <- filter(MSD_0, julian %in% ajam)
-# data1 <- filter(data1, julian %in% ajam) 
-# 
-# filter(data1, julian %in% ajam) %>% 
-#    inner_join(MSD_0, ., by = 'julian') %>% 
-#   arrange(julian)
-
-
-
-
-
-
-
-
-
+MSD_0 %>% 
+  nest(-type) %>% 
+  mutate(dif = purrr::map(.x = data, .f = dif_mean)) %>% 
+  unnest(dif) %>% 
+  arrange(desc(dif)) %>% 
+  filter(row_number() == 1)
 
