@@ -1412,159 +1412,6 @@ proof %>%
 # `------'`------'`------'`------'`------'
 
 
-
-
-new_JointCS <-  Joint_CS %>%
-  right_join(., coef) %>%
-  mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
-  dplyr::select(-data, -coef) %>%
-  mutate(data = purrr::map(.x = data_filling, .f = function(.x){ data <- .x %>%
-    mutate(mov = movavg(x = prec_C, n = 31, type = 't'),
-           mov_R = movavg(x = prec_R, n = 31, type = 't')) }))
-
-
-# Por ahora las pruebas 
-year_1982 <- new_JointCS %>% 
-  filter(row_number() == 1) %>% 
-  dplyr::select(station_N, Lon,  Lat, data) %>% 
-  unnest %>% 
-  filter(year == 1982) %>% 
-  rename(id = 'station_N' ) %>% 
-  dplyr::select(id, Lon, Lat, day, month, year, date, julian, mov)
-
-
-names(year_1982)
-
-
-# year_1982 %>% 
-#   ggplot() + 
-#   geom_line(aes(julian, mov)) +
-#   theme_bw() +
-#   labs(x = 'Día Juliano', y = "Promedio Triangular (mm)") 
-
-
-year_1982_f <- year_1982 %>% 
-  filter(between(month, 5, 8)) 
-
-
-
-
-
-julian <- year_1982_f %>% 
-  slice(1, n()) %>% 
-  .$julian
-
-dif <- (julian[2] + julian[1])/2
-
-
-
-#Dividir el periodo en 2 (porque si) ...
-
-
-row_1 <- year_1982_f %>% 
-  filter(julian <= dif) %>% 
-  arrange(desc(mov)) %>% 
-  slice(1)
-
-row_2 <- year_1982_f %>% 
-  filter(julian > dif) %>% 
-  arrange(desc(mov)) %>% 
-  slice(1)
-
-
-row_min <- year_1982_f %>% 
-  filter(between(julian,row_1$julian, row_2$julian )) %>% 
-  arrange(mov) %>% 
-  slice(1)
-  
-
-year_1982_f %>% 
-  ggplot() + 
-  geom_line(aes(julian, mov)) +
-  theme_bw() +
-  labs(x = 'Día Juliano', y = "Promedio Triangular (mm)")   + 
-  # geom_rect(aes(xmin= min(year_1982_f$julian), xmax=dif ,  ymin= 0, ymax= Inf),
-  #           alpha=0.2, fill="red") + 
-  annotate("rect", xmin= min(year_1982_f$julian), xmax=dif  ,  ymin= 0, ymax= Inf, fill="red", alpha = 0.1) +
-  annotate("rect", xmin= dif , xmax=  max(year_1982_f$julian),  ymin= 0, ymax= Inf, fill="blue", alpha = 0.1) +
-  geom_vline(xintercept = c(row_1$julian, row_2$julian, row_min$julian), colour = c('red', 'blue', 'yellow'))
-  
-
-  
-
-
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-dr <- read_csv("Drought/dr.csv")
-
-# # Testing other methodologies
-# year_pixel <-  filter(dr, year == 1989) %>% 
-#   dplyr::select(station_N, Lon , Lat ,day, month , year, julian, prec_C)
-# # mutate(mov =  movavg(x = prec_C, n = 31, type = 't'))
-# 
-# 
-# 
-# rain <- HoltWinters(year_pixel$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1] 
-# # rainseriesforecasts <- HoltWinters(rainfall, beta=FALSE, gamma=FALSE)
-# 
-# ideas_try <- year_pixel %>%
-#   mutate(mov =  movavg(x = prec_C, n = 31, type = 't'), ts = c(0,rain), 
-#          mov_ts = movavg(x = ts, n = 31, type = 't')) %>% 
-#   dplyr::select(-prec_C)
-# 
-# 
-# 
-# ideas_try %>% 
-#   filter(between(month, 5, 8)) %>%
-#   slice(1, n()) %>% 
-#   pull(julian)
-# 
-# 
-# 
-# ideas_try %>% 
-#   gather(key = var, value = value, -station_N, 
-#          -Lon ,-Lat , -day, -month, -year, -julian) %>% 
-#   ggplot(aes(x = julian, y = value, colour = var)) +
-#   geom_line() + 
-#   geom_vline(xintercept = c(121, 273),  color="blue", linetype="dashed", size=1)+
-#   facet_wrap(~var, ncol = 3) +
-#   labs(x = NULL, Y = 'Precipitation (mm)')+
-#   theme_bw() + 
-#   theme(legend.position = 'top')  
-# 
-# 
-# 
-# may_sep <- ideas_try %>% 
-#   filter(between(month, 5, 8)) %>% 
-#   mutate(Local_Tts = case_when(
-#     lag(mov_ts) > mov_ts & lead(mov_ts) > mov_ts ~ 1, 
-#     lead(mov_ts) < mov_ts & lag(mov_ts) < mov_ts ~ 2,
-#     TRUE ~ 0  ) ) 
-# 
-# max <-  may_sep %>% 
-#   filter(Local_Tts == 1) %>% 
-#   pull(julian)
-# 
-# 
-# min <- may_sep %>% 
-#   filter(Local_Tts == 2) %>% 
-#   pull(julian)
-# 
-# may_sep %>% 
-#   ggplot(aes(x = julian, y = mov_ts)) + 
-#   geom_line() + 
-#   geom_vline(xintercept = min, color = 'blue', linetype="dashed", size=1) + 
-#   geom_vline(xintercept = max, color = 'red', linetype="dashed", size=1) +
-#   theme_bw()
-
-
-
-
-
-
-
 ##############################################################################
 station <- read_csv("Drought/dr.csv")
 
@@ -1645,7 +1492,7 @@ canicula_after <- function(local_max, mins, maxs){
     # Ok this line select the second max.     
     second_max <- maxs %>% 
       filter(julian > min_after$julian) %>% 
-      mutate(num = paste0( 'sub', seq(1, (2*(nrow_base-1) + 1), by = 2), 'L')) %>% 
+      mutate(num = paste0( 'sub', seq(1, (2*(nrow(.)-1) + 1), by = 2), 'L')) %>% 
       filter(num == min_after$type)
 
     # (2*(1-1) + 1) ; (2*(2-1) + 1) ; (2*(3-1) + 1) ; (2*(4-1) + 1)
@@ -1703,9 +1550,13 @@ canicula_before <- function(local_max, mins, maxs){
   # In other case only create canicula with data NA.
   if(nrow(min_b) != 0){
     
+    
+    # seq(1, (2*(nrow(.)-1) + 1), by = 2)
+    
     ini_max <- maxs %>% 
       filter(julian < min_b$julian) %>% 
-      mutate(num = paste0( 'sub',rev(1:nrow(.)), 'L')) %>% 
+      # mutate(num = paste0( 'sub',rev(1:nrow(.)), 'L')) %>%
+      mutate(num = paste0( 'sub', rev(seq(1, (2*(nrow(.)-1) + 1), by = 2)), 'L')) %>%
       filter(num == min_b$type)
     
     # Here we create the final object...
@@ -1749,17 +1600,21 @@ define_two_MSD <- function(data){
     arrange(desc(mov_ts)) %>%
     slice(1)
   
+  if(nrow(GL_max) == 1){
+    # Step 3. Here we will do step 3. The idea it's run after_canicula function. 
+    canicula_A <- canicula_after(local_max = GL_max, mins = min, maxs = max)
+    # Step 4. Here we will do step 4. The idea it's run before_canicula function.  
+    canicula_B <- canicula_before(local_max = GL_max, mins = min, maxs = max)
+    
+    # Step_5. Here we join two MSD. 
+    MSD_two_sides <- bind_rows(canicula_A, canicula_B) %>%
+      mutate(type = c('A', 'B')) %>%
+      dplyr::select(type, start_date, min_date, end_date, length)  
+  }else{
+    MSD_two_sides <- tibble(type = 'N', start_date = NA, min_date = min$julian, end_date = NA, length = NA) %>% 
+      bind_rows(tibble(type = 'N', start_date = NA, min_date = min$julian, end_date = NA, length = NA), .)
+  }
   
-  # Step 3. Here we will do step 3. The idea it's run after_canicula function. 
-  canicula_A <- canicula_after(local_max = GL_max, mins = min, maxs = max)
-  
-  # Step 4. Here we will do step 4. The idea it's run before_canicula function.  
-  canicula_B <- canicula_before(local_max = GL_max, mins = min, maxs = max)
-
-  # Step_5. Here we join two MSD. 
-  MSD_two_sides <- bind_rows(canicula_A, canicula_B) %>%
-    mutate(type = c('A', 'B')) %>%
-    dplyr::select(type, start_date, min_date, end_date, length)
   
 return(MSD_two_sides)}
 
@@ -1849,8 +1704,30 @@ MSD_correction <- function(MSD_C){
 
 # This function return MSD object. 
 run_for_each_station <- function(dr){
+
+  # dr <- station
   
-  # tibble(year_to = 1982:year)
+   # for(i in 1:36){
+   #   print(paste0('number_', i))
+   # 
+   #   proof <- dr %>%
+   #     nest(-station_N, -Lon, -Lat, -year) %>%
+   #     mutate(data = purrr::map(.x = data, .f = curve_HoltWinters))  %>%
+   #     filter(row_number() == i) %>% dplyr::select(data) %>% unnest
+   # 
+   #   define_two_MSD(proof)
+   # }
+   # 
+   # proof <- dr %>%
+   #   nest(-station_N, -Lon, -Lat, -year) %>%
+   #   mutate(data = purrr::map(.x = data, .f = curve_HoltWinters))  %>%
+   #   filter(row_number() == 8) %>% dplyr::select(data) %>% unnest
+   # 
+   # ggplot(proof, aes(julian, mov_ts, colour = as.factor(type))) + geom_point() + theme_bw()
+   # 
+   # define_two_MSD(proof)
+
+  
   
   MSD_proof <- dr %>% 
     nest(-station_N, -Lon, -Lat, -year) %>% 
@@ -1870,5 +1747,32 @@ run_for_each_station <- function(dr){
 
 
 
+##################################################
+# Pruebas para correr todas las estaciones...
 
-run_for_each_station(station)
+MSD_test <- new_JointCS %>% 
+  dplyr::select(-NA_percent, -data_filling) %>% 
+  mutate(id = 1:nrow(.)) %>% 
+  unnest %>% 
+  dplyr::select(-prec_R, -mov_R) %>% 
+  nest(-id)
+
+
+
+
+test<- MSD_test %>%  # filter(row_number() == 6) %>%
+  mutate(MSD = purrr::map(.x = data, .f = run_for_each_station)) %>% 
+  dplyr::select(MSD) %>% 
+  unnest 
+
+
+
+# data <- MSD_test %>% filter(row_number() == 5) %>% dplyr::select(data) %>% 
+#   unnest
+
+# test %>%
+#   dplyr::select(station_N, length) %>%
+#   group_by(station_N) %>% 
+#   skimr::skim()
+
+
