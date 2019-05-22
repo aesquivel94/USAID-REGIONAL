@@ -1566,16 +1566,16 @@ dr <- read_csv("Drought/dr.csv")
 
 
 ##############################################################################
-dr <- read_csv("Drought/dr.csv")
+station <- read_csv("Drought/dr.csv")
 
 
 # This function (curve HoltWinters) summarise the time 
 # filter by year and compute HoltWinters - triangular mean. 
-curve_HoltWinters <- function(year_to){
+curve_HoltWinters <- function(dr){
   
   # Testing other methodologies...
-  year_pixel <-  filter(dr, year == year_to) %>% 
-    dplyr::select(station_N, Lon , Lat ,day, month , year, julian, prec_C)
+  year_pixel <-  dr %>% 
+    dplyr::select(day, month , julian, prec_C)
   # mutate(mov =  movavg(x = prec_C, n = 31, type = 't'))
   
   rain <- HoltWinters(year_pixel$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1] 
@@ -1594,7 +1594,7 @@ curve_HoltWinters <- function(year_to){
       lag(mov_ts) - mov_ts > 0  & lead(mov_ts) - mov_ts > 0  ~ 1, 
       lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
       TRUE ~ 0  ) )  
-return(jmm)}
+  return(jmm)}
 
 # Here we will do step 3. 
 # This function find the canicula when the general local maximo is canicula's start.
@@ -1810,16 +1810,16 @@ MSD_correction <- function(MSD_C){
     unnest(proof) %>% 
     filter(proof == 2) %>% 
     mutate(Two_MSD = purrr::map2(.x = Two_MSD, .y = data,.f = One_MSD)) %>% 
-    dplyr::select(year_to, Two_MSD) %>% 
+    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>% 
     unnest %>% 
-    dplyr::select(year_to, type)
+    dplyr::select(station_N, Lon, Lat,  year, type)
   
   
   # Extract the MSD selected. 
   MSD_C1 <- MSD_C %>% 
-    dplyr::select(year_to, Two_MSD) %>%
+    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>%
     unnest %>% 
-    nest(-year_to, -type) %>% 
+    nest(-station_N, -Lon, -Lat,  -year, -type) %>% 
     inner_join(MSD_C1, .) %>% 
     unnest
   
@@ -1829,7 +1829,7 @@ MSD_correction <- function(MSD_C){
     mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>%
     unnest(proof)  %>%
     filter(proof == 0) %>% 
-    dplyr::select(year_to, Two_MSD) %>% 
+    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>% 
     unnest %>% 
     mutate(type = 'N') %>% 
     unique()
@@ -1839,18 +1839,27 @@ MSD_correction <- function(MSD_C){
     mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>%
     unnest(proof)  %>%
     filter(proof == 1) %>% 
-    dplyr::select(year_to, Two_MSD) %>%
+    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>%
     unnest %>% 
     na.omit() %>% 
     bind_rows(MSD_C1, No_MSD, .) %>% 
-    arrange(year_to)
+    arrange(year)
   
   return(MSD)}
 
-
-
-
-
+# This function return MSD object. 
+run_for_each_station <- function(dr){
+  
+  # tibble(year_to = 1982:year)
+  
+  MSD_proof <- dr %>% 
+    nest(-station_N, -Lon, -Lat, -year) %>% 
+    mutate(data = purrr::map(.x = data, .f = curve_HoltWinters), 
+           Two_MSD = purrr::map(.x = data, .f = define_two_MSD))
+  
+  
+  MSD_proof <- MSD_correction(MSD_proof)
+  return(MSD_proof)}
 
 
 # jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
@@ -1861,9 +1870,5 @@ MSD_correction <- function(MSD_C){
 
 
 
-MSD_proof <- tibble(year_to = 1982:2017) %>% 
-  mutate(data = purrr::map(.x = year_to, .f = curve_HoltWinters), 
-         Two_MSD = purrr::map(.x = data, .f = define_two_MSD)) 
 
-MSD_proof <- MSD_correction(MSD_proof)
-
+run_for_each_station(station)
