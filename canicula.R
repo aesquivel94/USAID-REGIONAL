@@ -1777,9 +1777,9 @@ dif_mean <- function(f){
 One_MSD <- function(MSD1, data){
   
   # r <- 6
-  # data1 <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%  
-  #   filter(row_number() == r) %>% dplyr::select(data) %>% unnest()
-  # MSD <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%
+  # data <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%
+    # filter(row_number() == r) %>% dplyr::select(data) %>% unnest()
+  # MSD1 <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%
   #   filter(row_number() == r) %>% dplyr::select(Two_MSD) %>% unnest()
   
   # data1 %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + 
@@ -1789,7 +1789,7 @@ One_MSD <- function(MSD1, data){
   MSD <- MSD1 %>%
     dplyr::select(-length) %>% 
     gather(dates, julian, -type) %>% 
-    mutate(mov_ts = purrr::map(.x = julian, .f = function(.x){data1 %>% filter(julian == .x) %>% .$mov_ts}) ) %>% 
+    mutate(mov_ts = purrr::map(.x = julian, .f = function(.x){data %>% filter(julian == .x) %>% .$mov_ts}) ) %>% 
     unnest(mov_ts)  %>% 
     nest(-type) %>% 
     mutate(dif = purrr::map(.x = data, .f = dif_mean)) %>% 
@@ -1800,7 +1800,52 @@ One_MSD <- function(MSD1, data){
   return(MSD)}
 
 
-
+# This function organize the MSD, if we don't identify MSD put type = N, 
+# in the case we own two MSD the function selects one. 
+MSD_correction <- function(MSD_C){
+  
+  # Identify which it's MSD when we have two (what are the cases?)
+  MSD_C1 <- MSD_C %>% 
+    mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>% 
+    unnest(proof) %>% 
+    filter(proof == 2) %>% 
+    mutate(Two_MSD = purrr::map2(.x = Two_MSD, .y = data,.f = One_MSD)) %>% 
+    dplyr::select(year_to, Two_MSD) %>% 
+    unnest %>% 
+    dplyr::select(year_to, type)
+  
+  
+  # Extract the MSD selected. 
+  MSD_C1 <- MSD_C %>% 
+    dplyr::select(year_to, Two_MSD) %>%
+    unnest %>% 
+    nest(-year_to, -type) %>% 
+    inner_join(MSD_C1, .) %>% 
+    unnest
+  
+  
+  # Change type when we don't identify MSD. 
+  No_MSD <- MSD_C %>%
+    mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>%
+    unnest(proof)  %>%
+    filter(proof == 0) %>% 
+    dplyr::select(year_to, Two_MSD) %>% 
+    unnest %>% 
+    mutate(type = 'N') %>% 
+    unique()
+  
+  # Join all MSD. 
+  MSD <- MSD_C %>%
+    mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>%
+    unnest(proof)  %>%
+    filter(proof == 1) %>% 
+    dplyr::select(year_to, Two_MSD) %>%
+    unnest %>% 
+    na.omit() %>% 
+    bind_rows(MSD_C1, No_MSD, .) %>% 
+    arrange(year_to)
+  
+  return(MSD)}
 
 
 
@@ -1820,68 +1865,5 @@ MSD_proof <- tibble(year_to = 1982:2017) %>%
   mutate(data = purrr::map(.x = year_to, .f = curve_HoltWinters), 
          Two_MSD = purrr::map(.x = data, .f = define_two_MSD)) 
 
-
-
-# These years don't have MSD... (certain conditions are changed, MSD is found). 
-MSD_proof %>% 
-  dplyr::select(year_to, Two_MSD) %>% 
-  unnest() %>% 
-  filter(year_to %in% c(1995,1996,2001, 2005, 2009))
-
-
-
-######## Aquí hay que revisar en las bases de datos si se 
-######## cumple que los maximos sean mayor que los minimos. 
-########  Hay que hacer unas restas. 
-all_MSD <- MSD_proof %>% 
-  dplyr::select(year_to, Two_MSD) %>% 
-  unnest() %>% 
-  na.omit() 
-
-
-
-
-
-
-# Por ahora dejare el promedio de las diferencias como 
-# Years with two MSD. 
-
-# Two_MSD <- 
-MSD_proof %>%
-  # dplyr::select(year_to, Two_MSD) %>%
-  # unnest() %>%
-  filter(year_to %in% c(1988,1992,1993,2002,2007,2008))
-
-
-
-
-
-
-# Revisar esta parte porque no esta devolviendo bien los resultados. 
-
-MSD_proof1 <- MSD_proof %>% 
-  mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>% 
-  unnest(proof) %>% 
-  filter(proof == 2) %>% 
-  mutate(Two_MSD = purrr::map2(.x = Two_MSD, .y = data,.f = One_MSD)) %>% 
-  dplyr::select(year_to, Two_MSD) %>% 
-  unnest %>% 
-  dplyr::select(year_to, type)
-  
-
-
-MSD_proof %>% 
-  dplyr::select(year_to, Two_MSD) %>%
-  unnest %>% 
-  filter(year_to %in% MSD_proof1$year_to, type == MSD_proof1$type )
-
-
-
-
-MSD_proof %>% 
-  mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>% 
-  unnest(proof)  %>% 
-  dplyr::select(year_to, Two_MSD) %>% 
-  unnest
-
+MSD_proof <- MSD_correction(MSD_proof)
 
