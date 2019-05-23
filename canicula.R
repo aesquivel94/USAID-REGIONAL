@@ -84,29 +84,29 @@ nc_chirps <- ncdf4::nc_open(route)
 
 
 # Create a tibble with all dates and raster layers like tables. 
-tictoc::tic()
-Prec_table <- tibble(layer = 1:nc_chirps$dim$T$len) %>% 
-  mutate(date = make_date(1982,1,1) + (layer-1), julian = yday(date), 
-         year = year(date), month = month(date)) %>%  
-  # filter(row_number() < 2) %>% 
-  mutate(raster = purrr::map(.x = layer, 
-                             .f = function(.x){ HND[[.x]] %>% 
-                                 rasterToPoints(.) %>% 
-                                 data.frame() %>% 
-                                 set_names('x', 'y', 'prec') %>% 
-                                 mutate(id = 1:nrow(.))} ))
-tictoc::toc()
+# tictoc::tic()
+# Prec_table <- tibble(layer = 1:nc_chirps$dim$T$len) %>% 
+#   mutate(date = make_date(1982,1,1) + (layer-1), julian = yday(date), 
+#          year = year(date), month = month(date)) %>%  
+#   # filter(row_number() < 2) %>% 
+#   mutate(raster = purrr::map(.x = layer, 
+#                              .f = function(.x){ HND[[.x]] %>% 
+#                                  rasterToPoints(.) %>% 
+#                                  data.frame() %>% 
+#                                  set_names('x', 'y', 'prec') %>% 
+#                                  mutate(id = 1:nrow(.))} ))
+# tictoc::toc()
 # 728.19 sec = 12.1365
 
 
 
 
 # Do moving triangular average Filter - by year and pixel. 
-id_year_prec <- Prec_table %>% 
-  unnest  %>%
-  nest(-year, -id)  %>% 
-  mutate(data = purrr::map(.x = data, .f = function(.x){ data <- .x %>% 
-      mutate(mov = movavg(x = prec, n = 31, type = 't')) })) 
+# id_year_prec <- Prec_table %>% 
+#   unnest  %>%
+#   nest(-year, -id)  %>% 
+#   mutate(data = purrr::map(.x = data, .f = function(.x){ data <- .x %>% 
+#       mutate(mov = movavg(x = prec, n = 31, type = 't')) })) 
 # n = 30, atlas de canicula... (introduccion)... But in the other papers said 31 days.
 
 
@@ -130,11 +130,11 @@ id_year_prec <- Prec_table %>%
 # i=2.
 
 
-month_min <- 8;  tolerance <-  0.2
+# month_min <- 8;  tolerance <-  0.2
 
 # =-=-=-=-=-=-=-=-=-=-=-= Function ---- next_minimum. 
 #  This function compute a Min local min. 
-next_minimum <- function(x, fecha){
+# next_minimum <- function(x, fecha){
   
   # x <- pixel_yearT
   # fecha <- dates_canicula
@@ -193,7 +193,7 @@ next_minimum <- function(x, fecha){
 
 # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- left_max_MSD.
 # Function to do start MSD. This it's the first maximum.
-left_max_MSD <- function(Possible_dates, MinDate, tolerance){
+# left_max_MSD <- function(Possible_dates, MinDate, tolerance){
   
   # Possible_dates <- init_canicula
   # MinDate <- posible_minimo
@@ -235,7 +235,7 @@ left_max_MSD <- function(Possible_dates, MinDate, tolerance){
 
 # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- right_max_MSD.
 # Try to do second max. 
-right_max_MSD <- function(pyT, MinDate, tolerance){
+# right_max_MSD <- function(pyT, MinDate, tolerance){
   # pyT <- pixel_yearT
   # MinDate <- posible_minimo
   
@@ -293,7 +293,7 @@ right_max_MSD <- function(pyT, MinDate, tolerance){
 
 # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- MSD index. 
 # MSD index canicula 
-MSD_index <- function(pyT, canicula){
+# MSD_index <- function(pyT, canicula){
   # pyT <- pixel_yearT
   # canicula <- MSD
   
@@ -328,7 +328,7 @@ MSD_index <- function(pyT, canicula){
 # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- MSD_id_Year. 
 # This function do MSD for each id-year. 
 # For use this function is necesary next_minimum, left_max_MSD, right_max_MSD, MSD_index functions. 
-MSD_id_Year <- function(id, pixel_yearT){
+# MSD_id_Year <- function(id, pixel_yearT){
 
   # pixel_yearT <- id_year_prec %>%
   #   # filter(year == 2008, id ==34) %>%
@@ -457,30 +457,30 @@ return(MSD_R)}
 
 # =-=-=-=-=
 
-tictoc::tic()
-MSD_data <- id_year_prec %>% 
-  # filter(row_number() <5) %>% 
-  mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year)) # %>% 
-  # dplyr::select(-data) %>% 
-  # unnest()
-tictoc::toc() # 24.7
+# tictoc::tic()
+# MSD_data <- id_year_prec %>% 
+#   # filter(row_number() <5) %>% 
+#   mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year)) # %>% 
+#   # dplyr::select(-data) %>% 
+#   # unnest()
+# tictoc::toc() # 24.7
 
 
 
 
 
 # Save MSD data Grilled. 
-MSD_data %>% 
-  dplyr::select(year, MSD) %>% 
-  unnest %>% 
-  write_csv('MSD_Index/MSD_G.csv')
+# MSD_data %>% 
+#   dplyr::select(year, MSD) %>% 
+#   unnest %>% 
+#   write_csv('MSD_Index/MSD_G.csv')
 
 
 # Save MSD data Grilled. 
-MSD_data %>% 
-  dplyr::select(year, id,  data) %>% 
-  unnest %>% 
-  write_csv('MSD_Index/Data_G.csv')
+# MSD_data %>% 
+#   dplyr::select(year, id,  data) %>% 
+#   unnest %>% 
+#   write_csv('MSD_Index/Data_G.csv')
 
 
 
@@ -488,37 +488,37 @@ MSD_data %>%
 # MSD_data <- read_csv('MSD_Index/MSD_G.csv')
 
 # Percent NA by year.
-MSD_data %>%
-  dplyr::select(-data, -id) %>%
-  unnest %>%
-  group_by(year) %>%
-  summarise_at(vars(Min:Magnitude), .funs = function(x){round(sum(x == -999)/150, 2)}) %>%
-  ggplot(aes(x =  year, y =  Min)) +
-  geom_bar(stat = 'identity', fill = 'red') +
-  geom_hline(yintercept = 0.3) +
-  theme_bw() +
-  labs(x = NULL, y = '% NA')
+# MSD_data %>%
+#   dplyr::select(-data, -id) %>%
+#   unnest %>%
+#   group_by(year) %>%
+#   summarise_at(vars(Min:Magnitude), .funs = function(x){round(sum(x == -999)/150, 2)}) %>%
+#   ggplot(aes(x =  year, y =  Min)) +
+#   geom_bar(stat = 'identity', fill = 'red') +
+#   geom_hline(yintercept = 0.3) +
+#   theme_bw() +
+#   labs(x = NULL, y = '% NA')
 
 
 
 #  Summary by year (for the most important variables. )
-MSD_data %>%
-  dplyr::select(-data, -id)  %>% 
-  unnest %>% 
-  na_if(-999) %>%
-  dplyr::select( year, Length, Intensity, Magnitude) %>% 
-  group_by(year) %>% 
-  skimr::skim(.)  
+# MSD_data %>%
+#   dplyr::select(-data, -id)  %>% 
+#   unnest %>% 
+#   na_if(-999) %>%
+#   dplyr::select( year, Length, Intensity, Magnitude) %>% 
+#   group_by(year) %>% 
+#   skimr::skim(.)  
 
 
 # Summary for each year... Count NA data.
-MSD_data %>%
-  dplyr::select(-data, -id)  %>% 
-  unnest %>% 
-  na_if(-999) %>%
-  dplyr::select( year, Length) %>% 
-  group_by(year) %>% 
-  skimr::skim(.) 
+# MSD_data %>%
+#   dplyr::select(-data, -id)  %>% 
+#   unnest %>% 
+#   na_if(-999) %>%
+#   dplyr::select( year, Length) %>% 
+#   group_by(year) %>% 
+#   skimr::skim(.) 
 
 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-
@@ -532,169 +532,158 @@ dry_C <- read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Hond
 
 
 
-p_data  <- MSD_data %>%
-  dplyr::select(-data, -id)  %>%
-  unnest %>%
-  na_if(-999) %>% 
-  # dplyr::select(year,  x, y, Magnitude ) %>% 
-  # filter(between(year, 2015, 2018)) %>%
-  mutate(year = as.integer(year)) 
-
-p_data %>% dplyr::select(year) %>% unique
-
-
-anim <- ggplot(p_data) +
-  geom_tile(aes(x, y, fill = Magnitude )) + 
-  scale_fill_viridis(na.value="white",  direction = -1) + 
-  geom_sf(data = shp, fill = NA, color = gray(.5)) +
-  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
-  theme_bw() +
-  # Here comes the gganimate specific bits
-  labs(title = 'Year: {closest_state}', x = 'Longitud', y = 'Latitud') + 
-  transition_states(year, transition_length = 5, state_length = 8) +
-  enter_fade() +
-  exit_fade()
+# p_data  <- MSD_data %>%
+#   dplyr::select(-data, -id)  %>%
+#   unnest %>%
+#   na_if(-999) %>% 
+#   # dplyr::select(year,  x, y, Magnitude ) %>% 
+#   # filter(between(year, 2015, 2018)) %>%
+#   mutate(year = as.integer(year)) 
+# 
+# p_data %>% dplyr::select(year) %>% unique
 
 
-anim_save("MSD_Index/Magnitude_Chirps.gif", anim)
+# anim <- ggplot(p_data) +
+#   geom_tile(aes(x, y, fill = Magnitude )) + 
+#   scale_fill_viridis(na.value="white",  direction = -1) + 
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+#   theme_bw() +
+#   # Here comes the gganimate specific bits
+#   labs(title = 'Year: {closest_state}', x = 'Longitud', y = 'Latitud') + 
+#   transition_states(year, transition_length = 5, state_length = 8) +
+#   enter_fade() +
+#   exit_fade()
+
+
+# anim_save("MSD_Index/Magnitude_Chirps.gif", anim)
 
 
 # =-=-=-=-= Generación de los gif para las series de tiempo. 
 # library(ggplot2)
 
-MSD_data1 <- MSD_data %>% 
-  mutate(MSD = purrr::map2(.x = MSD, year,.f = function(.x, .y){
-    .x <- .x %>% 
-      mutate(year = .y)
-  }))
+# MSD_data1 <- MSD_data %>% 
+#   mutate(MSD = purrr::map2(.x = MSD, year,.f = function(.x, .y){
+#     .x <- .x %>% 
+#       mutate(year = .y)
+#   }))
+
+# Individual_graph <- function(Data_index, Data){
+#   # Data_index<- MSD_data1$MSD[[1]]
+#   # Data <- MSD_data1$data[[1]]
+#   
+#   Data_index <- Data_index %>% 
+#     na_if(-999)
+#   
+#   graph <-  Data  %>% 
+#     filter(between(month, 5, 10)) %>% 
+#     ggplot() + 
+#     geom_line(aes(julian, mov)) +
+#     theme_bw() +
+#     labs(x = 'Día Juliano', y = "Promedio Triangular (mm)") + 
+#     geom_vline( xintercept = c(Data_index$Start, Data_index$End), linetype=4, colour = 'blue') +
+#     geom_vline(xintercept = Data_index$Min,  linetype=4, colour = 'skyblue') + 
+#     labs(title = glue::glue('Id {Data_index$id}: Lon {Data_index$x} - Lat {Data_index$y} --- year {Data_index$year}'))
+#   
+#   print(graph)
+# }
 
 
+# by_id <- function(MSD_Local, id_pixel){
+#   # MSD_Local <- MSD_data1 %>%  filter(id == 2)
+# 
+#   img <- image_graph(600, 340, res = 96)
+#   out <- purrr::map2(.x = MSD_Local$MSD, 
+#                      .y = MSD_Local$data, 
+#                      .f = Individual_graph)
+#   dev.off()
+#   
+#   animation <- image_animate(img, fps = 2)
+#   # print(animation)
+#   image_write(animation, glue::glue("MSD_Index/Chirps_series_by_id/id_{id_pixel}.gif"))
+# }
 
-Individual_graph <- function(Data_index, Data){
-  # Data_index<- MSD_data1$MSD[[1]]
-  # Data <- MSD_data1$data[[1]]
-  
-  Data_index <- Data_index %>% 
-    na_if(-999)
-  
-  graph <-  Data  %>% 
-    filter(between(month, 5, 10)) %>% 
-    ggplot() + 
-    geom_line(aes(julian, mov)) +
-    theme_bw() +
-    labs(x = 'Día Juliano', y = "Promedio Triangular (mm)") + 
-    geom_vline( xintercept = c(Data_index$Start, Data_index$End), linetype=4, colour = 'blue') +
-    geom_vline(xintercept = Data_index$Min,  linetype=4, colour = 'skyblue') + 
-    labs(title = glue::glue('Id {Data_index$id}: Lon {Data_index$x} - Lat {Data_index$y} --- year {Data_index$year}'))
-  
-  print(graph)
-}
-
-
-by_id <- function(MSD_Local, id_pixel){
-  # MSD_Local <- MSD_data1 %>%  filter(id == 2)
-
-  img <- image_graph(600, 340, res = 96)
-  out <- purrr::map2(.x = MSD_Local$MSD, 
-                     .y = MSD_Local$data, 
-                     .f = Individual_graph)
-  dev.off()
-  
-  animation <- image_animate(img, fps = 2)
-  # print(animation)
-  image_write(animation, glue::glue("MSD_Index/Chirps_series_by_id/id_{id_pixel}.gif"))
-}
-
-tictoc::tic()
-MSD_data1 %>%  
-  dplyr::select(-year) %>% 
-  nest(-id) %>% 
-  mutate(try = purrr::map2(.x = data, .y = id, .f = by_id))
-tictoc::toc() # 1.47 h
+# tictoc::tic()
+# MSD_data1 %>%  
+#   dplyr::select(-year) %>% 
+#   nest(-id) %>% 
+#   mutate(try = purrr::map2(.x = data, .y = id, .f = by_id))
+# tictoc::toc() # 1.47 h
 # rm(MSD_data1)
 
 
-
-
-
-
-
-
-### Mean graphs And NA. 
+# ### Mean graphs And NA. 
+# # 
+# # Length <- MSD_data %>%
+# #   dplyr::select(-data, -id)  %>%
+# #   unnest %>%
+# #   na_if(-999) %>%
+# #   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
+# #   group_by(id, x, y) %>%
+# #   summarise_all(mean, na.rm = TRUE) %>%
+# #   # gather(Indicator, value, -id, -x, -y) %>%
+# #   ggplot(.) +
+# #   geom_tile(aes(x, y, fill = Length)) +
+# #   scale_fill_viridis(na.value="white",  direction = -1) +
+# #   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+# #   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+# #   theme_bw() +
+# #   labs(x = 'Longitud', y = 'Latitud', fill = 'Días', title = 'a).')
+# # 
+# # 
+# # Intensity <- MSD_data %>%
+# #   dplyr::select(-data, -id)  %>%
+# #   unnest %>%
+# #   na_if(-999) %>%
+# #   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
+# #   group_by(id, x, y) %>%
+# #   summarise_all(mean, na.rm = TRUE) %>%
+# #   # gather(Indicator, value, -id, -x, -y) %>%
+# #   ggplot(.) +
+# #   geom_tile(aes(x, y, fill = Intensity)) +
+# #   scale_fill_viridis(na.value="white",  direction = -1) +
+# #   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+# #   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+# #   theme_bw() +
+# #   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'b).')
 # 
-# Length <- MSD_data %>%
-#   dplyr::select(-data, -id)  %>%
-#   unnest %>%
-#   na_if(-999) %>%
-#   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
-#   group_by(id, x, y) %>%
-#   summarise_all(mean, na.rm = TRUE) %>%
-#   # gather(Indicator, value, -id, -x, -y) %>%
-#   ggplot(.) +
-#   geom_tile(aes(x, y, fill = Length)) +
-#   scale_fill_viridis(na.value="white",  direction = -1) +
-#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
-#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
-#   theme_bw() +
-#   labs(x = 'Longitud', y = 'Latitud', fill = 'Días', title = 'a).')
-# 
-# 
-# Intensity <- MSD_data %>%
-#   dplyr::select(-data, -id)  %>%
-#   unnest %>%
-#   na_if(-999) %>%
-#   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
-#   group_by(id, x, y) %>%
-#   summarise_all(mean, na.rm = TRUE) %>%
-#   # gather(Indicator, value, -id, -x, -y) %>%
-#   ggplot(.) +
-#   geom_tile(aes(x, y, fill = Intensity)) +
-#   scale_fill_viridis(na.value="white",  direction = -1) +
-#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
-#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
-#   theme_bw() +
-#   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'b).')
-
-# Magnitude <- MSD_data %>%
-#   dplyr::select(-data, -id)  %>%
-#   unnest %>%
-#   na_if(-999) %>%
-#   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
-#   group_by(id, x, y) %>%
-#   summarise_all(mean, na.rm = TRUE) %>%
-#   # gather(Indicator, value, -id, -x, -y) %>%
-#   ggplot(.) +
-#   geom_tile(aes(x, y, fill = Magnitude)) +
-#   scale_fill_viridis(na.value="white",  direction = -1) +
-#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
-#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
-#   theme_bw() +
-#   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'c).')
-# 
-# 
-# 
-# gridExtra::grid.arrange(Length, Intensity, Magnitude, ncol = 3)
-
-
-
+# # Magnitude <- MSD_data %>%
+# #   dplyr::select(-data, -id)  %>%
+# #   unnest %>%
+# #   na_if(-999) %>%
+# #   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
+# #   group_by(id, x, y) %>%
+# #   summarise_all(mean, na.rm = TRUE) %>%
+# #   # gather(Indicator, value, -id, -x, -y) %>%
+# #   ggplot(.) +
+# #   geom_tile(aes(x, y, fill = Magnitude)) +
+# #   scale_fill_viridis(na.value="white",  direction = -1) +
+# #   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+# #   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+# #   theme_bw() +
+# #   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'c).')
+# # 
+# # 
+# # 
+# # gridExtra::grid.arrange(Length, Intensity, Magnitude, ncol = 3)
 
 
 # Mapa de % de NA. 
 
-MSD_data %>%
-    dplyr::select(-data, -id)  %>%
-    unnest %>%
-    na_if(-999) %>% 
-  dplyr::select(year, id, x, y, Start) %>% 
-  group_by(id, x, y) %>% 
-  summarise_all(funs(sum(is.na(.))/37 * 100)) %>% 
-  ggplot(.) +
-  geom_tile(aes(x, y, fill = Start)) +
-  scale_fill_viridis(na.value="white",  direction = -1) +
-  geom_sf(data = shp, fill = NA, color = gray(.5)) +
-  geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
-  theme_bw() +
-  labs(x = 'Longitud', y = 'Latitud', fill = '%NA', title = 'a).')
+# MSD_data %>%
+#     dplyr::select(-data, -id)  %>%
+#     unnest %>%
+#     na_if(-999) %>% 
+#   dplyr::select(year, id, x, y, Start) %>% 
+#   group_by(id, x, y) %>% 
+#   summarise_all(funs(sum(is.na(.))/37 * 100)) %>% 
+#   ggplot(.) +
+#   geom_tile(aes(x, y, fill = Start)) +
+#   scale_fill_viridis(na.value="white",  direction = -1) +
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+#   theme_bw() +
+#   labs(x = 'Longitud', y = 'Latitud', fill = '%NA', title = 'a).')
 
 
 
@@ -720,74 +709,65 @@ Honduras_art <- tibble(x = -c(87.65, 87.15, 87.22), y = c(13.29, 13.32,14.06))
 #   theme_bw() + 
 #   labs(x = NULL, y = NULL, fill = 'NA %') + 
 #   geom_point(data = Honduras_art, aes(x, y))
-
   
-
-
- 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=
 # Do CPT file.
 # =-=-=-=-=-=-=-=-=-=-=-=-=-= 
+# CPT_file <- function(data, var){
+#  # data <- MSD_data
+#  # var <- 'Intensity'
+#   
+#    CPT_data <- data %>% 
+#     dplyr::select(-id, -data) %>% 
+#     unnest %>% 
+#     dplyr::select(year, id, !!var) %>% 
+#     spread(key = id, value = !!var) 
+#    
+#   Lat_Long  <- data %>% 
+#     dplyr::select(-id, -data) %>% 
+#     unnest %>% 
+#     dplyr::select(x, y) %>% 
+#     unique %>% 
+#     t() 
+# 
+#   colnames(Lat_Long) <- paste0(1:150)
+#   rownames(Lat_Long) <- NULL
+#   
+#   
+#   Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
+#   
+#   names(Lat_Long) <- c('', paste0('V',1:150))
+#   names(CPT_data) <- c('', paste0('V',1:150))
+# 
+# 
+#   
+#   # =-=-=-=-=-=-=-=-=-=-=-=
+#   CPT_data <- CPT_data %>% 
+#     mutate_if(is.factor, as.character) %>% 
+#     mutate_if(is.character, as.numeric)  %>%
+#     rbind(Lat_Long, .) 
+#   
+# 
+#   file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Chirps_', var, '.txt')
+#   
+#   
+#   sink(file = file)
+#   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
+#   cat('cpt:nfield=1', sep = '\n')
+#   cat(glue("cpt:field=days, cpt:nrow=37, cpt:ncol=150, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
+#   cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
+#   sink()
+# 
+# }  
   
+## MSD_data %>%
+##   dplyr::select(-id, -data) %>%
+##   unnest
+##  Var <- c(Length, Intensity, Magnitude)
 
-CPT_file <- function(data, var){
- # data <- MSD_data
- # var <- 'Intensity'
-  
-   CPT_data <- data %>% 
-    dplyr::select(-id, -data) %>% 
-    unnest %>% 
-    dplyr::select(year, id, !!var) %>% 
-    spread(key = id, value = !!var) 
-   
-  Lat_Long  <- data %>% 
-    dplyr::select(-id, -data) %>% 
-    unnest %>% 
-    dplyr::select(x, y) %>% 
-    unique %>% 
-    t() 
-
-  colnames(Lat_Long) <- paste0(1:150)
-  rownames(Lat_Long) <- NULL
-  
-  
-  Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
-  
-  names(Lat_Long) <- c('', paste0('V',1:150))
-  names(CPT_data) <- c('', paste0('V',1:150))
-
-
-  
-  # =-=-=-=-=-=-=-=-=-=-=-=
-  CPT_data <- CPT_data %>% 
-    mutate_if(is.factor, as.character) %>% 
-    mutate_if(is.character, as.numeric)  %>%
-    rbind(Lat_Long, .) 
-  
-
-  file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Chirps_', var, '.txt')
-  
-  
-  sink(file = file)
-  cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
-  cat('cpt:nfield=1', sep = '\n')
-  cat(glue("cpt:field=days, cpt:nrow=37, cpt:ncol=150, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
-  cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
-  sink()
-
-}  
-  
-# MSD_data %>% 
-#   dplyr::select(-id, -data) %>% 
-#   unnest   
-#  Var <- c(Length, Intensity, Magnitude)
-
-CPT_file(data = MSD_data, var = 'Length')
-CPT_file(data = MSD_data, var = 'Intensity')
-CPT_file(data = MSD_data, var = 'Magnitude')
-
-
-
+# CPT_file(data = MSD_data, var = 'Length')
+# CPT_file(data = MSD_data, var = 'Intensity')
+# CPT_file(data = MSD_data, var = 'Magnitude')
 
 
 
@@ -839,20 +819,7 @@ Catalog_M <- Catalog %>%
   
 
 
-
-
 # Data Filling with Chirps 
-
-
-# test <- id_year_prec %>%
-#   unnest %>% 
-#   dplyr::select(-layer, -julian, -mov) %>% 
-#   nest(-id, -x, -y) 
-
-
-# test$x
-# Catalog_M$Lon
-
 
 Station_Chirps <- raster::extract(HND, Catalog_M %>% dplyr::select(Lon, Lat)) %>% 
   as_tibble() %>% 
@@ -882,12 +849,9 @@ Station_Chirps <- Station_Chirps %>%
   dplyr::select(-data) %>%
   unnest() 
 
-
-
 StationM <- Station %>% 
   mutate(date = seq( make_date(1982,1,1) , make_date(2017,12,31), by = 'day')) %>% 
   gather(station_N, prec, -day, -month, -year, -date)
-
 
 
 # =-=-=-=-=- 
@@ -1010,57 +974,51 @@ new_JointCS <-  Joint_CS %>%
 
 # =-=-=-=-=-
 # Creo que justo aquí iba trabajando el viernes. 
-testing <- Joint_CS %>%
-  right_join(., coef) %>% 
-  mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
-  dplyr::select(-data, -coef) %>% 
-  dplyr::select(-NA_percent) %>%
-  # filter(row_number() == 1) %>% 
-  unnest 
+# testing <- Joint_CS %>%
+#   right_join(., coef) %>% 
+#   mutate(data_filling = purrr::map2(.x = data, .y = coef, .f = filling_data)) %>%
+#   dplyr::select(-data, -coef) %>% 
+#   dplyr::select(-NA_percent) %>%
+#   # filter(row_number() == 1) %>% 
+#   unnest 
 
 
 # Grafico de prec de las diapositivas. 
-testing %>% 
-  dplyr::select(station_N, prec, Chirps, julian, prec_R, prec_C) %>% 
-  gather(type, value, -station_N, -julian) %>% 
-  filter( type %in% c('prec', 'Chirps')) %>% 
-  ggplot(aes( x = julian, y = value, colour = type)) +
-  geom_line(alpha = 0.7) +
-  scale_color_viridis_d() +
-  facet_wrap(~station_N, nrow = 2) +
-  theme_bw()  +
-  theme(legend.position = 'top') + 
-  labs(x = 'Julian Day', y = 'Precipitation (mm)')
-
+# testing %>% 
+#   dplyr::select(station_N, prec, Chirps, julian, prec_R, prec_C) %>% 
+#   gather(type, value, -station_N, -julian) %>% 
+#   filter( type %in% c('prec', 'Chirps')) %>% 
+#   ggplot(aes( x = julian, y = value, colour = type)) +
+#   geom_line(alpha = 0.7) +
+#   scale_color_viridis_d() +
+#   facet_wrap(~station_N, nrow = 2) +
+#   theme_bw()  +
+#   theme(legend.position = 'top') + 
+#   labs(x = 'Julian Day', y = 'Precipitation (mm)')
 
 # :P
 
-
 # Grafico del llenado de datos. 
-testing %>% 
-  dplyr::select(station_N, prec, julian, prec_R) %>% 
-  mutate(Fill = ifelse(prec == prec_R, 'Original', 'Model')) %>%
-  ggplot(aes(x = julian, y = prec_R, group = station_N)) +
-  geom_line(colour = 'red') +
-  geom_line(mapping = aes(y = prec), lwd = 1.3) +
-  facet_wrap( ~ station_N,  nrow = 2) + 
-  theme_bw()  + 
-  labs(x = 'Julian Day', y = 'Precipitation (mm)')
-
-
+# testing %>% 
+#   dplyr::select(station_N, prec, julian, prec_R) %>% 
+#   mutate(Fill = ifelse(prec == prec_R, 'Original', 'Model')) %>%
+#   ggplot(aes(x = julian, y = prec_R, group = station_N)) +
+#   geom_line(colour = 'red') +
+#   geom_line(mapping = aes(y = prec), lwd = 1.3) +
+#   facet_wrap( ~ station_N,  nrow = 2) + 
+#   theme_bw()  + 
+#   labs(x = 'Julian Day', y = 'Precipitation (mm)')
 
 # Por estación ------ sin embargo hay que tener encuenta que no se presentan mas del 5% de NA. 
-testing %>% 
-  dplyr::select(station_N, prec, julian, prec_R) %>% 
-  mutate(Fill = ifelse(prec == prec_R, 'Original', 'Model')) %>%
-  filter(station_N == 'X56035_21deOctubre') %>% 
-  ggplot(aes(x = julian, y = prec_R)) +
-  geom_line(colour = 'red') +
-  geom_line(mapping = aes(y = prec), lwd = 1.3) +
-  theme_bw()  + 
-  labs(x = 'Julian Day', y = 'Precipitation (mm)')
-
-
+# testing %>% 
+#   dplyr::select(station_N, prec, julian, prec_R) %>% 
+#   mutate(Fill = ifelse(prec == prec_R, 'Original', 'Model')) %>%
+#   filter(station_N == 'X56035_21deOctubre') %>% 
+#   ggplot(aes(x = julian, y = prec_R)) +
+#   geom_line(colour = 'red') +
+#   geom_line(mapping = aes(y = prec), lwd = 1.3) +
+#   theme_bw()  + 
+#   labs(x = 'Julian Day', y = 'Precipitation (mm)')
 
 # new_JointCS %>% 
 #   dplyr::select(station_N, Lon,Lat,  data) %>% 
@@ -1070,33 +1028,30 @@ testing %>%
 
 # =-=-=-=-=-=-=-=-
 
-test <- new_JointCS %>% 
-  rename(x = 'Lon', y = 'Lat', id = 'station_N') %>% 
-  dplyr::select(-data_filling) %>% 
-  unnest %>% 
-  mutate(prec = prec_C) %>% # new row
-  dplyr::select(year, id, date, julian, month, x, y,  prec, mov, mov_R) %>% 
-  nest(-year, -id)
+# test <- new_JointCS %>% 
+#   rename(x = 'Lon', y = 'Lat', id = 'station_N') %>% 
+#   dplyr::select(-data_filling) %>% 
+#   unnest %>% 
+#   mutate(prec = prec_C) %>% # new row
+#   dplyr::select(year, id, date, julian, month, x, y,  prec, mov, mov_R) %>% 
+#   nest(-year, -id)
 
- 
-choluteca <- new_JointCS %>% 
-  dplyr::select(station_N , data) %>% 
-  filter(row_number() == 10) %>% 
-  unnest
+# choluteca <- new_JointCS %>% 
+#   dplyr::select(station_N , data) %>% 
+#   filter(row_number() == 10) %>% 
+#   unnest
 
-
-choluteca %>% 
-  dplyr::select(year, date, date, prec, prec_R) %>% 
-  filter(year == 2017) %>% 
-  ggplot(.) + 
-  geom_line(aes(date, prec_R), colour = 'red') + 
-  geom_line(aes(date, prec)) + 
-  theme_bw() +
-  labs(x = NULL, y = 'Precipitación (mm)') + 
-  geom_vline( xintercept = as.numeric(as.Date("2017-05-01")), linetype=4, colour = 'blue') +
-  geom_vline( xintercept = as.numeric(as.Date("2017-09-01")), linetype=4, colour = 'blue')
+# choluteca %>% 
+#   dplyr::select(year, date, date, prec, prec_R) %>% 
+#   filter(year == 2017) %>% 
+#   ggplot(.) + 
+#   geom_line(aes(date, prec_R), colour = 'red') + 
+#   geom_line(aes(date, prec)) + 
+#   theme_bw() +
+#   labs(x = NULL, y = 'Precipitación (mm)') + 
+#   geom_vline( xintercept = as.numeric(as.Date("2017-05-01")), linetype=4, colour = 'blue') +
+#   geom_vline( xintercept = as.numeric(as.Date("2017-09-01")), linetype=4, colour = 'blue')
   
-
 # row_test <- test %>% 
 #   filter(row_number() == 300) 
 #   
@@ -1115,52 +1070,46 @@ choluteca %>%
 # 
 # MSD_id_Year(id = id, pixel_yearT = pixel_yearT)
 
-
-
 # Voy a hacer esta prueba con el llenado de la regresión: R. 
-proof <- test %>% 
-  unnest %>% 
-  dplyr::select(-mov) %>% 
-  rename(mov = 'mov_R') %>% 
-  nest(-year, -id) %>% 
-  mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year))
-
+# proof <- test %>% 
+#   unnest %>% 
+#   dplyr::select(-mov) %>% 
+#   rename(mov = 'mov_R') %>% 
+#   nest(-year, -id) %>% 
+#   mutate(MSD = purrr::map2(.x = id, .y = data, .f = MSD_id_Year))
 
 # Skim (solo para resumen. )
-proof %>% 
-  dplyr::select(-data) %>% 
-  unnest %>% 
-  dplyr::select(id, Intensity, Length, Magnitude) %>% 
-  dplyr::select(id, Length) %>% 
-  na_if(-999) %>% 
-  group_by(id) %>% 
-  skim()
-
+# proof %>% 
+#   dplyr::select(-data) %>% 
+#   unnest %>% 
+#   dplyr::select(id, Intensity, Length, Magnitude) %>% 
+#   dplyr::select(id, Length) %>% 
+#   na_if(-999) %>% 
+#   group_by(id) %>% 
+#   skim()
 
 # =-=-=-=-=-=-=-=-=-=
-graph <- proof %>% 
-  # filter(year == 2017) %>% 
-  dplyr::select(-data) %>%
-  unnest %>% 
-  na_if(-999) %>% 
-  mutate(year = as.integer(year))
+# graph <- proof %>% 
+#   # filter(year == 2017) %>% 
+#   dplyr::select(-data) %>%
+#   unnest %>% 
+#   na_if(-999) %>% 
+#   mutate(year = as.integer(year))
 
-
- 
-  anim <- ggplot(graph) +
-  geom_point(aes(x, y, colour = Length)) +  
-  scale_colour_viridis(na.value="white",  direction = -1) +  
-  geom_sf(data = shp, fill = NA, color = gray(.5)) +
-  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
-  theme_bw() + 
-  # geom_point(data = Honduras_art, aes(x, y)) # +
-    # Here comes the gganimate specific bits
-  labs(title = 'Year: {closest_state}', x = 'Longitud', y = 'Latitud') + 
-  transition_states(year, transition_length = 5, state_length = 8) +
-  enter_fade() +
-  exit_fade()
-  
-  anim_save("MSD_Index/Length_stations.gif", anim)
+  # anim <- ggplot(graph) +
+  # geom_point(aes(x, y, colour = Length)) +  
+  # scale_colour_viridis(na.value="white",  direction = -1) +  
+  # geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  # geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  # theme_bw() + 
+  # # geom_point(data = Honduras_art, aes(x, y)) # +
+  #   # Here comes the gganimate specific bits
+  # labs(title = 'Year: {closest_state}', x = 'Longitud', y = 'Latitud') + 
+  # transition_states(year, transition_length = 5, state_length = 8) +
+  # enter_fade() +
+  # exit_fade()
+  # 
+  # anim_save("MSD_Index/Length_stations.gif", anim)
   
 
 
@@ -1170,151 +1119,119 @@ graph <- proof %>%
 # Hacer la serie de llenado de datos para estaciones
 # Intentar hacer el llenado de datos (modelo-por año)...
 
+# choluteca_MSD <- proof %>% 
+#     dplyr::select(id, year, MSD) %>%
+#     filter(id == 'X78724_choluteca', year == 2004) %>% 
+#     unnest %>% 
+#     dplyr::select(-id1)
 
-  choluteca_MSD <- proof %>% 
-    dplyr::select(id, year, MSD) %>%
-    filter(id == 'X78724_choluteca', year == 2004) %>% 
-    unnest %>% 
-    dplyr::select(-id1)
-
-  
-  
-choluteca %>% 
-    filter(year == 2017) %>% 
-    filter(between(month, 5, 9)) %>% 
-    ggplot(.) +
-    geom_line(aes(julian, mov)) + 
-    geom_vline( xintercept = c(choluteca_MSD$Start, choluteca_MSD$End), 
-                linetype=4, colour = 'blue') +
-   geom_vline(xintercept = c(choluteca_MSD$Min), 
-              linetype=4, colour = 'skyblue') + 
-  theme_bw()
+# choluteca %>% 
+#     filter(year == 2017) %>% 
+#     filter(between(month, 5, 9)) %>% 
+#     ggplot(.) +
+#     geom_line(aes(julian, mov)) + 
+#     geom_vline( xintercept = c(choluteca_MSD$Start, choluteca_MSD$End), 
+#                 linetype=4, colour = 'blue') +
+#    geom_vline(xintercept = c(choluteca_MSD$Min), 
+#               linetype=4, colour = 'skyblue') + 
+#   theme_bw()
     
-
-
-
-
-
-
-
-
-
-
 
 # =-=-=-=-= Generación de los gif para las series de tiempo. 
 
+# proof1 <- proof %>% 
+#   mutate(MSD = purrr::map2(.x = MSD, year,.f = function(.x, .y){
+#     .x <- .x %>% 
+#       mutate(year = .y)
+#   }))
 
-proof1 <- proof %>% 
-  mutate(MSD = purrr::map2(.x = MSD, year,.f = function(.x, .y){
-    .x <- .x %>% 
-      mutate(year = .y)
-  }))
+# Individual_graph <- function(Data_index, Data){
+#   # Data_index<- MSD_data1$MSD[[1]]
+#   # Data <- MSD_data1$data[[1]]
+#   
+#   Data_index <- Data_index %>% 
+#     na_if(-999)
+#   
+#   graph <-  Data  %>% 
+#     filter(between(month, 5, 10)) %>% 
+#     ggplot() + 
+#     geom_line(aes(julian, mov)) +
+#     theme_bw() +
+#     labs(x = 'Día Juliano', y = "Promedio Triangular (mm)") + 
+#     geom_vline( xintercept = c(Data_index$Start, Data_index$End), linetype=4, colour = 'blue') +
+#     geom_vline(xintercept = Data_index$Min,  linetype=4, colour = 'skyblue') + 
+#     labs(title = glue::glue('Id {Data_index$id}: Lon {Data_index$x} - Lat {Data_index$y} --- year {Data_index$year}'))
+#   
+#   print(graph)
+# }
+# by_id <- function(MSD_Local, id_pixel){
+#   # MSD_Local <- MSD_data1 %>%  filter(id == 2)
+#   
+#   img <- image_graph(600, 340, res = 96)
+#   out <- purrr::map2(.x = MSD_Local$MSD, 
+#                      .y = MSD_Local$data, 
+#                      .f = Individual_graph)
+#   dev.off()
+#   
+#   animation <- image_animate(img, fps = 2)
+#   # print(animation)
+#   image_write(animation, glue::glue("MSD_Index/Station_by_id/id_{id_pixel}.gif"))
+# }
 
-
-
-Individual_graph <- function(Data_index, Data){
-  # Data_index<- MSD_data1$MSD[[1]]
-  # Data <- MSD_data1$data[[1]]
-  
-  Data_index <- Data_index %>% 
-    na_if(-999)
-  
-  graph <-  Data  %>% 
-    filter(between(month, 5, 10)) %>% 
-    ggplot() + 
-    geom_line(aes(julian, mov)) +
-    theme_bw() +
-    labs(x = 'Día Juliano', y = "Promedio Triangular (mm)") + 
-    geom_vline( xintercept = c(Data_index$Start, Data_index$End), linetype=4, colour = 'blue') +
-    geom_vline(xintercept = Data_index$Min,  linetype=4, colour = 'skyblue') + 
-    labs(title = glue::glue('Id {Data_index$id}: Lon {Data_index$x} - Lat {Data_index$y} --- year {Data_index$year}'))
-  
-  print(graph)
-}
-by_id <- function(MSD_Local, id_pixel){
-  # MSD_Local <- MSD_data1 %>%  filter(id == 2)
-  
-  img <- image_graph(600, 340, res = 96)
-  out <- purrr::map2(.x = MSD_Local$MSD, 
-                     .y = MSD_Local$data, 
-                     .f = Individual_graph)
-  dev.off()
-  
-  animation <- image_animate(img, fps = 2)
-  # print(animation)
-  image_write(animation, glue::glue("MSD_Index/Station_by_id/id_{id_pixel}.gif"))
-}
-
-
-
-
-tictoc::tic()
-proof1 %>%  
-  dplyr::select(-year) %>% 
-  nest(-id) %>% 
-  mutate(try = purrr::map2(.x = data, .y = id, .f = by_id))
-tictoc::toc() # 1.47 h
+# tictoc::tic()
+# proof1 %>%  
+#   dplyr::select(-year) %>% 
+#   nest(-id) %>% 
+#   mutate(try = purrr::map2(.x = data, .y = id, .f = by_id))
+# tictoc::toc() # 1.47 h
 # rm(MSD_data1)
 
 
-
-
-
-
-CPT_file_s <- function(data, var){
-  data <- proof
-  var <- 'Intensity'
-  
- 
-  
-  CPT_data <- data %>% 
-    dplyr::select(-id, -data) %>% 
-    unnest %>% 
-    dplyr::select(year, id, !!var) %>% 
-    mutate_if(is.numeric, list(~round(., 1))) %>%
-    spread(key = id, value = !!var)  
-  
-  Lat_Long  <- data %>% 
-    dplyr::select(-id, -data) %>% 
-    unnest %>% 
-    dplyr::select(x, y) %>% 
-    unique %>% 
-    t() 
-  
-  colnames(Lat_Long) <- paste0(1:10)
-  rownames(Lat_Long) <- NULL
-  
-  
-  Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
-  
-  names(Lat_Long) <- c('', paste0('V',1:10))
-  names(CPT_data) <- c('', paste0('V',1:10))
-  
-  
-  
-  # =-=-=-=-=-=-=-=-=-=-=-=
-  CPT_data <- CPT_data %>% 
-    mutate_if(is.factor, as.character) %>% 
-    mutate_if(is.character, as.numeric)  %>%
-    rbind(Lat_Long, .) 
-  
- 
-  file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Station_', var, '.txt')
-  
-  sink(file = file)
-  cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
-  cat('cpt:nfield=1', sep = '\n')
-  cat(glue("cpt:field=days, cpt:nrow=36, cpt:ncol=10, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
-  cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
-  sink()
-  
-}  
+# CPT_file_s <- function(data, var){
+#   data <- proof
+#   var <- 'Intensity'
+#   
+#   CPT_data <- data %>% 
+#     dplyr::select(-id, -data) %>% 
+#     unnest %>% 
+#     dplyr::select(year, id, !!var) %>% 
+#     mutate_if(is.numeric, list(~round(., 1))) %>%
+#     spread(key = id, value = !!var)  
+#   
+#   Lat_Long  <- data %>% 
+#     dplyr::select(-id, -data) %>% 
+#     unnest %>% 
+#     dplyr::select(x, y) %>% 
+#     unique %>% 
+#     t() 
+#   
+#   colnames(Lat_Long) <- paste0(1:10)
+#   rownames(Lat_Long) <- NULL
+#   
+#   Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
+#   
+#   names(Lat_Long) <- c('', paste0('V',1:10))
+#   names(CPT_data) <- c('', paste0('V',1:10))
+#   
+#   # =-=-=-=-=-=-=-=-=-=-=-=
+#   CPT_data <- CPT_data %>% 
+#     mutate_if(is.factor, as.character) %>% 
+#     mutate_if(is.character, as.numeric)  %>%
+#     rbind(Lat_Long, .) 
+#   
+#   file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Station_', var, '.txt')
+#   
+#   sink(file = file)
+#   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
+#   cat('cpt:nfield=1', sep = '\n')
+#   cat(glue("cpt:field=days, cpt:nrow=36, cpt:ncol=10, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
+#   cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
+#   sink()
+# }  
 
 # proof
 # Intensity - Length - Magnitude
-CPT_file_s(data = proof, var = 'Intensity' )
-
-
+# CPT_file_s(data = proof, var = 'Intensity' )
 
 
 ### Mean graphs And NA. 
@@ -1372,29 +1289,21 @@ CPT_file_s(data = proof, var = 'Intensity' )
 # gridExtra::grid.arrange(Length, Intensity, Magnitude, ncol = 3)
 
 
-
-
-
 # Mapa de % de NA. 
-
-proof %>%
-  dplyr::select(year ,MSD) %>%
-  unnest %>%
-  na_if(-999) %>%
-  dplyr::select(year, id, x, y, Start) %>% 
-  group_by(id, x, y) %>% 
-  summarise_all(funs(sum(is.na(.))/36 * 100)) %>% 
-  ggplot(.) +
-  geom_point(aes(x, y, colour = Start)) +
-  scale_colour_viridis(na.value="white",  direction = -1) +
-  geom_sf(data = shp, fill = NA, color = gray(.5)) +
-  geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
-  theme_bw() +
-  labs(x = 'Longitud', y = 'Latitud', fill = '%NA', title = 'b).')
-
-
-
-
+# proof %>%
+#   dplyr::select(year ,MSD) %>%
+#   unnest %>%
+#   na_if(-999) %>%
+#   dplyr::select(year, id, x, y, Start) %>% 
+#   group_by(id, x, y) %>% 
+#   summarise_all(funs(sum(is.na(.))/36 * 100)) %>% 
+#   ggplot(.) +
+#   geom_point(aes(x, y, colour = Start)) +
+#   scale_colour_viridis(na.value="white",  direction = -1) +
+#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
+#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+#   theme_bw() +
+#   labs(x = 'Longitud', y = 'Latitud', fill = '%NA', title = 'b).')
 
 
 
@@ -1759,13 +1668,50 @@ MSD_test <- new_JointCS %>%
 
 
 
-
+# Aquí se corre la canicula por estaciones. 
 test<- MSD_test %>%  # filter(row_number() == 6) %>%
   mutate(MSD = purrr::map(.x = data, .f = run_for_each_station)) %>% 
   dplyr::select(MSD) %>% 
   unnest 
 
 
+
+
+
+
+
+test1 <- test %>% 
+  rename(x = 'Lon', y = 'Lat') %>% 
+  dplyr::select( station_N, x,  y , length) %>% 
+  group_by(station_N,  x,  y) %>% 
+  summarise(NA_p = (sum(is.na(length))/36)*100, count_NA = sum(is.na(length))) %>% 
+  mutate(na_cat = case_when(
+    NA_p < 10 ~ '[0-10) %',
+    NA_p < 20 & NA_p >= 10 ~ '[10-20) %', 
+    NA_p < 30 & NA_p >= 20 ~ '[20-30) %', 
+    NA_p >= 30 ~ '30% +'))
+
+p <- ggplot(test1)  + 
+  geom_point(aes(x = x, y =  y, colour = NA_p)) +
+  scale_colour_viridis(na.value="white",  direction = -1) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
+  
+
+q <- ggplot(test1)  + 
+  geom_point(aes(x = x, y =  y, colour = na_cat)) +
+  scale_colour_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
+
+
+out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/'
+
+gridExtra::grid.arrange(p, q, ncol = 2)
 
 # data <- MSD_test %>% filter(row_number() == 5) %>% dplyr::select(data) %>% 
 #   unnest
@@ -1775,4 +1721,148 @@ test<- MSD_test %>%  # filter(row_number() == 6) %>%
 #   group_by(station_N) %>% 
 #   skimr::skim()
 
+
+
+# Gift por estaciones. 
+
+
+# proof1 <- proof %>% 
+#   mutate(MSD = purrr::map2(.x = MSD, year,.f = function(.x, .y){
+#      .x <- .x %>% 
+#        mutate(year = .y)   }))
+# 
+
+#  
+# by_id <- function(MSD_Local, id_pixel){
+#    # MSD_Local <- MSD_data1 %>%  filter(id == 2)
+#    
+#    img <- image_graph(600, 340, res = 96)
+#    out <- purrr::map2(.x = MSD_Local$MSD, 
+#                       .y = MSD_Local$data, 
+#                       .f = Individual_graph)
+#    dev.off()
+#    
+#    animation <- image_animate(img, fps = 2)
+#    # print(animation)
+#    image_write(animation, glue::glue("MSD_Index/Station_by_id/id_{id_pixel}.gif"))
+#  }
+# 
+#  tictoc::tic()
+#  proof1 %>%  
+#    dplyr::select(-year) %>% 
+#    nest(-id) %>% 
+#    mutate(try = purrr::map2(.x = data, .y = id, .f = by_id))
+#  tictoc::toc() # 1.47 h
+#  rm(MSD_data1)
+
+
+
+
+data <- MSD_test %>% 
+  filter(id == 1) %>% 
+  dplyr::select(data) %>% 
+  unnest %>% 
+  filter(year == 1982)
+
+# curve_HoltWinters(data)
+
+
+data_curve_by_year <- function(data){
+  # Testing other methodologies...
+  year_pixel <-  data %>% 
+    dplyr::select(day, month , julian, prec_C)
+  # mutate(mov =  movavg(x = prec_C, n = 31, type = 't'))
+  
+  rain <- HoltWinters(year_pixel$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1] 
+  # rainseriesforecasts <- HoltWinters(rainfall, beta=FALSE, gamma=FALSE)
+  
+  data_base <- year_pixel %>%
+    mutate(mov =  movavg(x = prec_C, n = 31, type = 't'), ts = c(0,rain), 
+           mov_ts = movavg(x = ts, n = 31, type = 't')) %>% 
+    dplyr::select(-prec_C)  %>% 
+    filter(month %in% 5:8) %>%
+    dplyr::select(julian, month, mov_ts) %>% 
+    mutate(type = case_when(
+      lag(mov_ts) - mov_ts > 0  & lead(mov_ts) - mov_ts > 0  ~ 1, 
+      lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
+      TRUE ~ 0  ) ) 
+return(data_base)}
+
+ 
+
+prueba <- MSD_test %>% 
+  unnest() %>% 
+  nest(-id, -station_N, -Lon, -Lat, -year) %>% 
+mutate(data_curve = purrr::map(.x = data, .f = data_curve_by_year))
+
+
+ajam <- test %>% 
+  mutate(year_to = year) %>% 
+  nest(-Lon, -Lat, -year) %>% 
+  rename(MSD = 'data')
+
+
+
+prueba <- prueba %>%
+  dplyr::select(-data) %>% 
+  # filter(id == 1, year == 1982) %>%
+  inner_join(ajam, .)
+
+
+
+
+
+
+
+ Individual_graph <- function(Data_index, Data){
+   # Data_index<- prueba$MSD[[1]]
+   # Data <- prueba$data_curve[[1]]
+
+   # Data_index <- Data_index %>%
+   #   na_if(-999)
+
+   graph <-  ggplot(Data) +
+     geom_point(aes(julian, mov_ts, colour = as.factor(type))) + 
+     geom_line(aes(julian, mov_ts)) +
+     theme_bw() +
+     labs(x = 'Julian day', y = "HoltWinters - Triangular Average (mm)", colour = '') +
+     geom_vline( xintercept = c(Data_index$start_date, Data_index$end_date), 
+                 linetype=4, colour = 'blue') +
+     geom_vline(xintercept = Data_index$min_date,  linetype=4, colour = 'skyblue') +
+     labs(title = glue::glue('Station {Data_index$station_N} --- year {Data_index$year_to}')) +
+     scale_colour_manual(values = c('gray', 'blue', 'red'), 
+                         breaks = c("0", "1", "2"), 
+                         labels = c('Normal', 'Local_Min', 'Local_Max')) # +
+     # theme(legend.position = 'top')
+   print(graph)
+ }
+
+ 
+ 
+ by_id <- function(MSD_Local, id_pixel){
+   MSD_Local <- prueba %>%  filter(id == 2) %>% dplyr::select(data)
+   
+   MSD_Local <- unnest(MSD_Local)
+   
+
+    img <- image_graph(1200, 680, res = 96)
+    out <- purrr::map2(.x = MSD_Local$MSD,
+                       .y = MSD_Local$data_curve,
+                       .f = Individual_graph)
+    dev.off()
+
+    animation <- magick::image_animate(img, fps = 1)
+    # print(animation)
+    image_write(animation, glue::glue("Drought/Station_R/station/id_{id_pixel}.gif"))
+ }
+ 
+ 
+ 
+ 
+ 
+ prueba <- prueba %>% 
+   # filter(id == 1)  %>% 
+   dplyr::select(id, MSD, data_curve) %>% 
+   nest(-id )
+ 
 
