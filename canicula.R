@@ -1813,7 +1813,7 @@ prueba <- prueba %>%
 
 
 
-
+# Aqui se genera la forma del grafico...
  Individual_graph <- function(Data_index, Data){
    # Data_index<- prueba$MSD[[1]]
    # Data <- prueba$data_curve[[1]]
@@ -1837,12 +1837,11 @@ prueba <- prueba %>%
    print(graph)
  }
 
- 
- 
+ # Aqui se genera el gift...
  by_id <- function(MSD_Local, id_pixel){
-   MSD_Local <- prueba %>%  filter(id == 2) %>% dplyr::select(data)
+   # MSD_Local <- prueba %>%  filter(id == 2) %>% dplyr::select(data) %>% unnest
    
-   MSD_Local <- unnest(MSD_Local)
+   # MSD_Local <- unnest(MSD_Local)
    
 
     img <- image_graph(1200, 680, res = 96)
@@ -1851,18 +1850,31 @@ prueba <- prueba %>%
                        .f = Individual_graph)
     dev.off()
 
-    animation <- magick::image_animate(img, fps = 1)
+    animation <- magick::image_animate(img, fps = 0.5)
     # print(animation)
     image_write(animation, glue::glue("Drought/Station_R/station/id_{id_pixel}.gif"))
  }
  
  
- 
- 
- 
+ ## Listo probando. 
  prueba <- prueba %>% 
    # filter(id == 1)  %>% 
    dplyr::select(id, MSD, data_curve) %>% 
    nest(-id )
  
 
+
+ 
+ 
+tictoc::tic()
+ test1 <-  prueba %>%
+   # filter(row_number() == 1) %>% 
+   mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id))
+tictoc::toc() # 1.37 h
+ # by_id(MSD_Local = test1$data[[1]], id_pixel = test1$id)
+ 
+ 
+ 
+ 
+ 
+ 
