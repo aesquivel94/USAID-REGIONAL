@@ -194,134 +194,134 @@ nc_chirps <- ncdf4::nc_open(route)
 # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- left_max_MSD.
 # Function to do start MSD. This it's the first maximum.
 # left_max_MSD <- function(Possible_dates, MinDate, tolerance){
-  
-  # Possible_dates <- init_canicula
-  # MinDate <- posible_minimo
-  
-  
-  # day when occur min local min. 
-  date_minimo <- MinDate %>%
-    dplyr::select(date) %>%
-    pull
-  
-  
-  # find the possible start canicula. 
-  left_maximum <- Possible_dates %>%
-    filter(date < date_minimo - 5)
-  
-  # dates to find posibble start canicula.
-  date_maximo <- left_maximum %>%
-    dplyr::select(date) %>%
-    pull
-  
-  # Compute the difference of the days with the min local min. 
-  left_maximum <- tibble(minimo = date_minimo, maximo = date_maximo) %>%
-    mutate(day = time_length(maximo - minimo, "day")) %>%
-    arrange(desc(day))
-  # filter(row_number()==1)
-  
-  
-  # Aqui se hay un problema 
-  left_maximum <- inner_join(Possible_dates, left_maximum, by = c('date' = 'maximo')) %>%
-    mutate(pendiente = (mov - MinDate$mov)/mov) %>%
-    filter(pendiente >= tolerance) %>% # Mod
-    arrange(desc(mov)) %>% 
-    filter(row_number()==1)
-  
-  
-  return(left_maximum)}
+#   
+#   # Possible_dates <- init_canicula
+#   # MinDate <- posible_minimo
+#   
+#   
+#   # day when occur min local min. 
+#   date_minimo <- MinDate %>%
+#     dplyr::select(date) %>%
+#     pull
+#   
+#   
+#   # find the possible start canicula. 
+#   left_maximum <- Possible_dates %>%
+#     filter(date < date_minimo - 5)
+#   
+#   # dates to find posibble start canicula.
+#   date_maximo <- left_maximum %>%
+#     dplyr::select(date) %>%
+#     pull
+#   
+#   # Compute the difference of the days with the min local min. 
+#   left_maximum <- tibble(minimo = date_minimo, maximo = date_maximo) %>%
+#     mutate(day = time_length(maximo - minimo, "day")) %>%
+#     arrange(desc(day))
+#   # filter(row_number()==1)
+#   
+#   
+#   # Aqui se hay un problema 
+#   left_maximum <- inner_join(Possible_dates, left_maximum, by = c('date' = 'maximo')) %>%
+#     mutate(pendiente = (mov - MinDate$mov)/mov) %>%
+#     filter(pendiente >= tolerance) %>% # Mod
+#     arrange(desc(mov)) %>% 
+#     filter(row_number()==1)
+#   
+#   
+#   return(left_maximum)}
 # =-=-=-=-=-=-=-=-=-=-=-= 
 
 
 # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- right_max_MSD.
 # Try to do second max. 
 # right_max_MSD <- function(pyT, MinDate, tolerance){
-  # pyT <- pixel_yearT
-  # MinDate <- posible_minimo
-  
-  # day when occur min local min. 
-  date_minimo <- MinDate %>%
-    dplyr::select(date) %>%
-    pull
-  
-  End <- pyT %>%
-    filter(Local ==2, date >= date_minimo + 5)  %>%
-    top_n(4, wt = mov) %>%
-    arrange(desc(mov))  %>%
-    mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
-    # filter(pendiente >= 0.20)  manana pienso que hacer aqui
-    filter(pendiente >= tolerance)
-  
-  
-  End_1 <- End %>% 
-    arrange(desc(pendiente)) %>% 
-    filter(row_number() == 1) %>% 
-    dplyr::select(-pendiente)
-  
-  second_max <- End %>% 
-    mutate(date_minimo = date_minimo) %>% 
-    nest(- julian ) %>%
-    mutate(increments = purrr::map(.x = data, .f = function(.x){ # Aqui...
-      # .x <-pyT %>% filter(Local ==2, date >= date_minimo + 5) %>% top_n(4, wt = mov) %>%
-      #   arrange(desc(mov))  %>%  mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
-      #   filter(pendiente >= 0.20)  %>% mutate(date_minimo = date_minimo) %>%
-      #   nest(- julian ) %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
-      
-      pyT %>% 
-        mutate(ti = (mov - lag(mov))/mov) %>%
-        filter(between(date, .x$date_minimo  + 5, .x$date)) %>% 
-        summarise(acum_ti = sum(ti), mean_ti = mean(ti), median_ti = median(ti))
-    }) ) %>% 
-    dplyr::select(-data)  %>% 
-    unnest() %>%
-    arrange(desc(mean_ti)) %>% 
-    filter(row_number() == 1) 
-  
-  if(nrow(second_max) != 0){
-    second_max <-   pyT %>% 
-      filter(julian ==  second_max %>% dplyr::select(julian) %>% as.numeric()) %>% 
-      bind_rows(End_1) %>% 
-      mutate(type = c('End', 'End2'))
-    
-  } else{
-    second_max <- second_max 
-  }
-  
-  return(second_max)}
+#   # pyT <- pixel_yearT
+#   # MinDate <- posible_minimo
+#   
+#   # day when occur min local min. 
+#   date_minimo <- MinDate %>%
+#     dplyr::select(date) %>%
+#     pull
+#   
+#   End <- pyT %>%
+#     filter(Local ==2, date >= date_minimo + 5)  %>%
+#     top_n(4, wt = mov) %>%
+#     arrange(desc(mov))  %>%
+#     mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
+#     # filter(pendiente >= 0.20)  manana pienso que hacer aqui
+#     filter(pendiente >= tolerance)
+#   
+#   
+#   End_1 <- End %>% 
+#     arrange(desc(pendiente)) %>% 
+#     filter(row_number() == 1) %>% 
+#     dplyr::select(-pendiente)
+#   
+#   second_max <- End %>% 
+#     mutate(date_minimo = date_minimo) %>% 
+#     nest(- julian ) %>%
+#     mutate(increments = purrr::map(.x = data, .f = function(.x){ # Aqui...
+#       # .x <-pyT %>% filter(Local ==2, date >= date_minimo + 5) %>% top_n(4, wt = mov) %>%
+#       #   arrange(desc(mov))  %>%  mutate(pendiente = (mov - MinDate$mov)/mov)  %>%
+#       #   filter(pendiente >= 0.20)  %>% mutate(date_minimo = date_minimo) %>%
+#       #   nest(- julian ) %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
+#       
+#       pyT %>% 
+#         mutate(ti = (mov - lag(mov))/mov) %>%
+#         filter(between(date, .x$date_minimo  + 5, .x$date)) %>% 
+#         summarise(acum_ti = sum(ti), mean_ti = mean(ti), median_ti = median(ti))
+#     }) ) %>% 
+#     dplyr::select(-data)  %>% 
+#     unnest() %>%
+#     arrange(desc(mean_ti)) %>% 
+#     filter(row_number() == 1) 
+#   
+#   if(nrow(second_max) != 0){
+#     second_max <-   pyT %>% 
+#       filter(julian ==  second_max %>% dplyr::select(julian) %>% as.numeric()) %>% 
+#       bind_rows(End_1) %>% 
+#       mutate(type = c('End', 'End2'))
+#     
+#   } else{
+#     second_max <- second_max 
+#   }
+#   
+#   return(second_max)}
 # =-=-=-=-=-=-=-=-=-=-=-= 
 
 
 # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- MSD index. 
 # MSD index canicula 
 # MSD_index <- function(pyT, canicula){
-  # pyT <- pixel_yearT
-  # canicula <- MSD
-  
-  
-  Length <- canicula$julian[3] - canicula$julian[1]
-  
-  Intensity <- pyT %>% 
-    filter(between(julian, canicula$julian[1], canicula$julian[3])) %>% 
-    summarise(Intensity =  mean(prec)) %>% 
-    as.numeric()
-  
-  Magnitude <- pyT %>% 
-    filter(julian == canicula$julian[2]) %>% 
-    dplyr::select(prec) %>% 
-    as.numeric()
-  
-  
-  
-  MSD_I <- canicula %>% 
-    dplyr::select(id, x, y, julian) %>% 
-    filter(row_number() == 2) %>% 
-    rename(Min = 'julian') %>% 
-    bind_cols(.,  tibble(Start = canicula$julian[1], End = canicula$julian[3], End_P = canicula$julian[4],
-                         Length = Length, Intensity = Intensity, Magnitude = Magnitude) )
-  
-  
-  
-  return(MSD_I)}
+#   # pyT <- pixel_yearT
+#   # canicula <- MSD
+#   
+#   
+#   Length <- canicula$julian[3] - canicula$julian[1]
+#   
+#   Intensity <- pyT %>% 
+#     filter(between(julian, canicula$julian[1], canicula$julian[3])) %>% 
+#     summarise(Intensity =  mean(prec)) %>% 
+#     as.numeric()
+#   
+#   Magnitude <- pyT %>% 
+#     filter(julian == canicula$julian[2]) %>% 
+#     dplyr::select(prec) %>% 
+#     as.numeric()
+#   
+#   
+#   
+#   MSD_I <- canicula %>% 
+#     dplyr::select(id, x, y, julian) %>% 
+#     filter(row_number() == 2) %>% 
+#     rename(Min = 'julian') %>% 
+#     bind_cols(.,  tibble(Start = canicula$julian[1], End = canicula$julian[3], End_P = canicula$julian[4],
+#                          Length = Length, Intensity = Intensity, Magnitude = Magnitude) )
+#   
+#   
+#   
+#   return(MSD_I)}
 # =-=-=-=-=-=-=-=-=-=-=-= 
 
 
@@ -329,129 +329,129 @@ nc_chirps <- ncdf4::nc_open(route)
 # This function do MSD for each id-year. 
 # For use this function is necesary next_minimum, left_max_MSD, right_max_MSD, MSD_index functions. 
 # MSD_id_Year <- function(id, pixel_yearT){
-
-  # pixel_yearT <- id_year_prec %>%
-  #   # filter(year == 2008, id ==34) %>%
-  #   filter(row_number() == 2) %>%
-  #   dplyr::select(data) %>%
-  #   unnest()
-  # 
-  # id <- id_year_prec %>%
-  #   # filter(year == 2008, id ==34) %>%
-  #   dplyr::select(id) %>%
-  #   filter(row_number() == 2) %>%
-  #   unique() %>%
-  #   as.numeric()
-  
-  # First select id and year data set and 
-  # create variable Local (define if it's or not local min-max).
-  pixel_yearT <-    pixel_yearT  %>% 
-    mutate(id = id) %>% 
-    filter(month %in% 5:10) %>% # 
-    mutate(Local = case_when(
-      lag(mov) > mov & lead(mov) > mov ~ 1, 
-      lead(mov) < mov & lag(mov) < mov ~ 2,
-      TRUE ~ 0  ) )
- 
-  
-  print( pixel_yearT %>% 
-    filter(row_number() == 1) %>% 
-    dplyr::select(date, id) %>% 
-      mutate(month_min = month_min, tolerance = tolerance))
-  
-  
-  
-  # Compute the first local max in the data.
-  first_maximum <- pixel_yearT %>%
-    filter(Local == 2) %>%
-    filter(row_number()==1) %>%
-    pull(julian)
-
-  
-  # Dates would be possible start MSD.
-  init_canicula <- pixel_yearT %>%
-    filter(Local ==2) %>%
-    filter(julian >=first_maximum, julian < 225) %>%
-    top_n(4, wt = mov) %>%
-    arrange(desc(mov)) %>%
-    filter(row_number() <= 3)
-
-    
-  # Last date would be possible MSD. 
-  last_date <- pixel_yearT %>%
-    filter(row_number() == n())
-
-    
-  # Look for the next local minimun (including the end of the period). 
-  dates_canicula <- init_canicula %>%
-    bind_rows(last_date) %>%
-    pull(date)
-  
-
-  # =-=-=-=-=-=-=-=-=-=-=-= Function ---- next_minimum. 
-
-  
-  # In this point we compute the Local min. 
-  posible_minimo <- next_minimum(x = pixel_yearT, fecha = dates_canicula)
-
-
-  # rm(pixel_yearT, id, init_canicula, first_maximum, last_date, dates_canicula, posible_minimo)
-   
-  # This point we compute if the Local min is in a establish limits. 
-  cond_canicula <- posible_minimo %>%
-    mutate(cond_midsummer = between(month, 6, month_min)) %>% # Mod
-    pull(cond_midsummer)
-  
-  
-  # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- left_max_MSD.
- 
-  # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- right_max_MSD.
-  
-  # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- MSD index. 
-  
-  
-  # In this point we compute the start MSD. 
-  left_start <- left_max_MSD(Possible_dates = init_canicula, MinDate =  posible_minimo, tolerance = tolerance)
-  right_End <- right_max_MSD(pyT = pixel_yearT, MinDate = posible_minimo, tolerance = tolerance)
-  
- 
-  
-  if(isTRUE(cond_canicula) &  nrow(left_start) != 0 &  nrow(right_End) != 0){
-    
-    # Create MDS Index.
-    MSD <- bind_rows(left_start, posible_minimo, right_End) %>% 
-      dplyr::select(-minimo, -day, -pendiente) %>% 
-      mutate(type = c('Start', 'Min', 'End', 'End2'))
-    
-    # p <- ggplot() + 
-    #   geom_line(data = pixel_yearT, aes(julian, mov)) + 
-    #   # geom_line(aes(julian, prec)) +
-    #   geom_vline(data = left_start, mapping=aes(xintercept=julian), color='blue') +
-    #   geom_vline(data = posible_minimo, mapping=aes(xintercept=julian), color='red') +
-    #   # geom_vline(data = right_End, mapping=aes(xintercept=julian)) +
-    #   geom_smooth(data = pixel_yearT, aes(julian, mov)) +
-    #   labs(x = 'Julian day', y = 'Triangular Moving Average (mm)') + 
-    #   theme_light()
-    
-    
-    MSD_R <- MSD_index(pyT = pixel_yearT, canicula = MSD)
-    
-    # print(p)
-    
-  }else{
-    
-    cowsay::say("Sorry we couldn't find midsummer drought (canicula)!", 
-                "smallcat", what_color = "blue")
-    
-    MSD_R <- pixel_yearT %>% 
-      filter(row_number() == 1) %>% 
-      dplyr::select(id, x, y) %>% 
-      mutate(Min = -999, Start = -999, End = -999, End_P = -999, 
-             Length = -999, Intensity = -999, Magnitude = -999)
-  }
-
-
-return(MSD_R)}
+# 
+#   # pixel_yearT <- id_year_prec %>%
+#   #   # filter(year == 2008, id ==34) %>%
+#   #   filter(row_number() == 2) %>%
+#   #   dplyr::select(data) %>%
+#   #   unnest()
+#   # 
+#   # id <- id_year_prec %>%
+#   #   # filter(year == 2008, id ==34) %>%
+#   #   dplyr::select(id) %>%
+#   #   filter(row_number() == 2) %>%
+#   #   unique() %>%
+#   #   as.numeric()
+#   
+#   # First select id and year data set and 
+#   # create variable Local (define if it's or not local min-max).
+#   pixel_yearT <-    pixel_yearT  %>% 
+#     mutate(id = id) %>% 
+#     filter(month %in% 5:10) %>% # 
+#     mutate(Local = case_when(
+#       lag(mov) > mov & lead(mov) > mov ~ 1, 
+#       lead(mov) < mov & lag(mov) < mov ~ 2,
+#       TRUE ~ 0  ) )
+#  
+#   
+#   print( pixel_yearT %>% 
+#     filter(row_number() == 1) %>% 
+#     dplyr::select(date, id) %>% 
+#       mutate(month_min = month_min, tolerance = tolerance))
+#   
+#   
+#   
+#   # Compute the first local max in the data.
+#   first_maximum <- pixel_yearT %>%
+#     filter(Local == 2) %>%
+#     filter(row_number()==1) %>%
+#     pull(julian)
+# 
+#   
+#   # Dates would be possible start MSD.
+#   init_canicula <- pixel_yearT %>%
+#     filter(Local ==2) %>%
+#     filter(julian >=first_maximum, julian < 225) %>%
+#     top_n(4, wt = mov) %>%
+#     arrange(desc(mov)) %>%
+#     filter(row_number() <= 3)
+# 
+#     
+#   # Last date would be possible MSD. 
+#   last_date <- pixel_yearT %>%
+#     filter(row_number() == n())
+# 
+#     
+#   # Look for the next local minimun (including the end of the period). 
+#   dates_canicula <- init_canicula %>%
+#     bind_rows(last_date) %>%
+#     pull(date)
+#   
+# 
+#   # =-=-=-=-=-=-=-=-=-=-=-= Function ---- next_minimum. 
+# 
+#   
+#   # In this point we compute the Local min. 
+#   posible_minimo <- next_minimum(x = pixel_yearT, fecha = dates_canicula)
+# 
+# 
+#   # rm(pixel_yearT, id, init_canicula, first_maximum, last_date, dates_canicula, posible_minimo)
+#    
+#   # This point we compute if the Local min is in a establish limits. 
+#   cond_canicula <- posible_minimo %>%
+#     mutate(cond_midsummer = between(month, 6, month_min)) %>% # Mod
+#     pull(cond_midsummer)
+#   
+#   
+#   # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- left_max_MSD.
+#  
+#   # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- right_max_MSD.
+#   
+#   # =-=-=-=-=-=-=-=-=-=-=-= Function  ---- MSD index. 
+#   
+#   
+#   # In this point we compute the start MSD. 
+#   left_start <- left_max_MSD(Possible_dates = init_canicula, MinDate =  posible_minimo, tolerance = tolerance)
+#   right_End <- right_max_MSD(pyT = pixel_yearT, MinDate = posible_minimo, tolerance = tolerance)
+#   
+#  
+#   
+#   if(isTRUE(cond_canicula) &  nrow(left_start) != 0 &  nrow(right_End) != 0){
+#     
+#     # Create MDS Index.
+#     MSD <- bind_rows(left_start, posible_minimo, right_End) %>% 
+#       dplyr::select(-minimo, -day, -pendiente) %>% 
+#       mutate(type = c('Start', 'Min', 'End', 'End2'))
+#     
+#     # p <- ggplot() + 
+#     #   geom_line(data = pixel_yearT, aes(julian, mov)) + 
+#     #   # geom_line(aes(julian, prec)) +
+#     #   geom_vline(data = left_start, mapping=aes(xintercept=julian), color='blue') +
+#     #   geom_vline(data = posible_minimo, mapping=aes(xintercept=julian), color='red') +
+#     #   # geom_vline(data = right_End, mapping=aes(xintercept=julian)) +
+#     #   geom_smooth(data = pixel_yearT, aes(julian, mov)) +
+#     #   labs(x = 'Julian day', y = 'Triangular Moving Average (mm)') + 
+#     #   theme_light()
+#     
+#     
+#     MSD_R <- MSD_index(pyT = pixel_yearT, canicula = MSD)
+#     
+#     # print(p)
+#     
+#   }else{
+#     
+#     cowsay::say("Sorry we couldn't find midsummer drought (canicula)!", 
+#                 "smallcat", what_color = "blue")
+#     
+#     MSD_R <- pixel_yearT %>% 
+#       filter(row_number() == 1) %>% 
+#       dplyr::select(id, x, y) %>% 
+#       mutate(Min = -999, Start = -999, End = -999, End_P = -999, 
+#              Length = -999, Intensity = -999, Magnitude = -999)
+#   }
+# 
+# 
+# return(MSD_R)}
 # =-=-=-=-=-=-=-=-=-=-=-= 
 
 
@@ -1675,11 +1675,6 @@ test<- MSD_test %>%  # filter(row_number() == 6) %>%
   unnest 
 
 
-
-
-
-
-
 test1 <- test %>% 
   rename(x = 'Lon', y = 'Lat') %>% 
   dplyr::select( station_N, x,  y , length) %>% 
@@ -1713,6 +1708,9 @@ out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought
 
 gridExtra::grid.arrange(p, q, ncol = 2)
 
+write.csv(test, glue::glue('{out_folder}HW_TM_MSD.csv'))
+
+
 # data <- MSD_test %>% filter(row_number() == 5) %>% dplyr::select(data) %>% 
 #   unnest
 
@@ -1724,39 +1722,6 @@ gridExtra::grid.arrange(p, q, ncol = 2)
 
 
 # Gift por estaciones. 
-
-
-# proof1 <- proof %>% 
-#   mutate(MSD = purrr::map2(.x = MSD, year,.f = function(.x, .y){
-#      .x <- .x %>% 
-#        mutate(year = .y)   }))
-# 
-
-#  
-# by_id <- function(MSD_Local, id_pixel){
-#    # MSD_Local <- MSD_data1 %>%  filter(id == 2)
-#    
-#    img <- image_graph(600, 340, res = 96)
-#    out <- purrr::map2(.x = MSD_Local$MSD, 
-#                       .y = MSD_Local$data, 
-#                       .f = Individual_graph)
-#    dev.off()
-#    
-#    animation <- image_animate(img, fps = 2)
-#    # print(animation)
-#    image_write(animation, glue::glue("MSD_Index/Station_by_id/id_{id_pixel}.gif"))
-#  }
-# 
-#  tictoc::tic()
-#  proof1 %>%  
-#    dplyr::select(-year) %>% 
-#    nest(-id) %>% 
-#    mutate(try = purrr::map2(.x = data, .y = id, .f = by_id))
-#  tictoc::toc() # 1.47 h
-#  rm(MSD_data1)
-
-
-
 
 data <- MSD_test %>% 
   filter(id == 1) %>% 
@@ -1808,11 +1773,6 @@ prueba <- prueba %>%
   # filter(id == 1, year == 1982) %>%
   inner_join(ajam, .)
 
-
-
-
-
-
 # Aqui se genera la forma del grafico...
  Individual_graph <- function(Data_index, Data){
    # Data_index<- prueba$MSD[[1]]
@@ -1855,16 +1815,11 @@ prueba <- prueba %>%
     image_write(animation, glue::glue("Drought/Station_R/station/id_{id_pixel}.gif"))
  }
  
- 
  ## Listo probando. 
  prueba <- prueba %>% 
    # filter(id == 1)  %>% 
    dplyr::select(id, MSD, data_curve) %>% 
    nest(-id )
- 
-
-
- 
  
 tictoc::tic()
  test1 <-  prueba %>%
@@ -1877,4 +1832,45 @@ tictoc::toc() # 1.37 h
  
  
  
- 
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# Proof a new metogology spliting data time serie  ---- using 
+
+# .------..------..------..------..------.
+# |P.--. ||R.--. ||O.--. ||O.--. ||F.--. |
+# | :/\: || :(): || :/\: || :/\: || :(): |
+# | (__) || ()() || :\/: || :\/: || ()() |
+# | '--'P|| '--'R|| '--'O|| '--'O|| '--'F|
+# `------'`------'`------'`------'`------'
+
+
+##############################################################################
+# Test with acum data...
+
+
+for(i in 1982:2017){
+  up <- station %>%  filter(year == i)  %>% 
+    mutate(roll_acum = zoo::rollsum(x = prec_C, 31, align = "right", fill = NA))
+  
+  a <- HoltWinters(up$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1]
+  
+  up2 <- station %>%  filter(year == i) %>% 
+    mutate(HW = c(0,HoltWinters(up$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1]), 
+           roll_acum = zoo::rollsum(x = HW, 31, align = "right", fill = NA), 
+           mov_HW = movavg(x = HW , n = 31, type = 't')) %>% 
+    filter(month %in% 5:8)
+  
+  a <- up2 %>%  ggplot() +  geom_line(aes(x = julian, y = roll_acum)) + 
+    geom_point(aes(x = julian, y = roll_acum)) + theme_bw() +
+    labs(title = 'Cumulative precipitation: black (HoltWinters)', x = 'Julian day')
+  
+  b <- up2 %>% ggplot() + geom_line(aes(x = julian, y = mov_HW)) +
+    geom_line(aes(x = julian, y = mov), colour = 'red') + 
+    geom_point(aes(x = julian, y = mov), colour = 'red') +
+    geom_point(aes(x = julian, y = mov_HW)) + theme_bw() + 
+    labs(title = 'Triangular averange: red (non-transformation) - black (HoltWinters)', x = 'Julian day')
+  
+  c <- gridExtra::grid.arrange(a, b, ncol = 2)
+  ggsave(c, filename = glue::glue('Drought/Station_R/acum_mov/y{i}.png'), width = 32, height = 16, units = "cm")
+}
+
