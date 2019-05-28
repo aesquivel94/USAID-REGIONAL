@@ -1775,8 +1775,8 @@ prueba <- prueba %>%
 
 # Aqui se genera la forma del grafico...
  Individual_graph <- function(Data_index, Data){
-   # Data_index<- prueba$MSD[[1]]
-   # Data <- prueba$data_curve[[1]]
+   # Data_index<- MSD_Local$MSD[[1]]
+   # Data <- MSD_Local$data_curve[[1]]
 
    # Data_index <- Data_index %>%
    #   na_if(-999)
@@ -2014,23 +2014,107 @@ write.csv(test_o, glue::glue('{out_folder}O_TM_MSD.csv'))
 
 
 
-
-
-
-
-
-
-
-
-
 # =-=-=-=-=-=-=
 
+data_Oy <- function(data){
+
+  data_base <- data %>%
+    filter(month %in% 5:8) %>%
+    rename(mov_ts = mov) %>% 
+    dplyr::select(julian, month, mov_ts) %>% 
+    mutate(type = case_when(
+      lag(mov_ts) - mov_ts > 0  & lead(mov_ts) - mov_ts > 0  ~ 1, 
+      lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
+      TRUE ~ 0  ) ) 
+  return(data_base)}
+
+# MSD_tO
+
+prueba_o <- MSD_tO %>% 
+  unnest() %>% 
+  nest(-id, -station_N, -Lon, -Lat, -year) %>% 
+  mutate(data_curve = purrr::map(.x = data, .f = data_Oy))
+
+
+ajam_o <- test_o %>% 
+  mutate(year_to = year) %>% 
+  nest(-Lon, -Lat, -year) %>% 
+  rename(MSD = 'data')
+
+
+
+prueba_o <- prueba_o %>%
+  dplyr::select(-data) %>% 
+  # filter(id == 1, year == 1982) %>%
+  inner_join(ajam_o, .)
+
+
+# Data_index<- MSD_Local$MSD[[1]]
+# Data <- MSD_Local$data_curve[[1]]
+
+
+## Listo probando. 
+prueba_o <- prueba_o %>% 
+  # filter(id == 1)  %>% 
+  dplyr::select(id, MSD, data_curve) %>% 
+  nest(-id )
+
+
+
+# Aqui se genera la forma del grafico...
+Individual_graph_o <- function(Data_index, Data){
+  # Data_index<- MSD_Local$MSD[[1]]
+  # Data <- MSD_Local$data_curve[[1]]
+  
+  # Data_index <- Data_index %>%
+  #   na_if(-999)
+  
+  graph <-  ggplot(Data) +
+    geom_point(aes(julian, mov_ts, colour = as.factor(type))) + 
+    geom_line(aes(julian, mov_ts)) +
+    theme_bw() +
+    labs(x = 'Julian day', y = "Triangular Average (mm)", colour = '') +
+    geom_vline( xintercept = c(Data_index$start_date, Data_index$end_date), 
+                linetype=4, colour = 'blue') +
+    geom_vline(xintercept = Data_index$min_date,  linetype=4, colour = 'skyblue') +
+    labs(title = glue::glue('Station {Data_index$station_N} --- year {Data_index$year_to}')) +
+    scale_colour_manual(values = c('gray', 'blue', 'red'), 
+                        breaks = c("0", "1", "2"), 
+                        labels = c('Normal', 'Local_Min', 'Local_Max')) # +
+  # theme(legend.position = 'top')
+  print(graph)
+}
+
+# Aqui se genera el gift...
+by_id_o <- function(MSD_Local, id_pixel){
+  # MSD_Local <- prueba_o %>%  filter(id == 2) %>% dplyr::select(data) %>% unnest
+  
+  # MSD_Local <- unnest(MSD_Local)
+  
+  
+  img <- image_graph(1200, 680, res = 96)
+  out <- purrr::map2(.x = MSD_Local$MSD,
+                     .y = MSD_Local$data_curve,
+                     .f = Individual_graph_o)
+  dev.off()
+  
+  animation <- magick::image_animate(img, fps = 0.5)
+  # print(animation)
+  image_write(animation, glue::glue("Drought/Station_R/original_data/id_{id_pixel}.gif"))
+}
 
 
 
 
 
 
+
+tictoc::tic()
+test1_o <-  prueba_o %>%
+  # filter(row_number() == 1) %>% 
+  mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id_o))
+tictoc::toc() # 1.37 h
+# by_id(MSD_Local = test1$data[[1]], id_pixel = test1$id)
 
 
 
