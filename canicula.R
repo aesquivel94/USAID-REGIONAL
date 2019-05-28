@@ -1855,14 +1855,17 @@ for(i in 1982:2017){
   a <- HoltWinters(up$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1]
   
   up2 <- station %>%  filter(year == i) %>% 
-    mutate(HW = c(0,HoltWinters(up$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1]), 
+    mutate(roll_A = zoo::rollsum(x = prec_C, 31, align = "right", fill = NA),
+      HW = c(0,HoltWinters(up$prec_C, beta=FALSE, gamma=FALSE)$fitted[,1]), 
            roll_acum = zoo::rollsum(x = HW, 31, align = "right", fill = NA), 
            mov_HW = movavg(x = HW , n = 31, type = 't')) %>% 
     filter(month %in% 5:8)
   
   a <- up2 %>%  ggplot() +  geom_line(aes(x = julian, y = roll_acum)) + 
-    geom_point(aes(x = julian, y = roll_acum)) + theme_bw() +
-    labs(title = 'Cumulative precipitation: black (HoltWinters)', x = 'Julian day')
+    geom_point(aes(x = julian, y = roll_acum)) +  
+    geom_line(aes(x = julian, y = roll_A), colour = 'red') + 
+    geom_point(aes(x = julian, y = roll_A), colour = 'red')+ theme_bw() +
+    labs(title = 'Cumulative prec: red (non-transformation) - black (HoltWinters)', x = 'Julian day')
   
   b <- up2 %>% ggplot() + geom_line(aes(x = julian, y = mov_HW)) +
     geom_line(aes(x = julian, y = mov), colour = 'red') + 
@@ -1873,4 +1876,169 @@ for(i in 1982:2017){
   c <- gridExtra::grid.arrange(a, b, ncol = 2)
   ggsave(c, filename = glue::glue('Drought/Station_R/acum_mov/y{i}.png'), width = 32, height = 16, units = "cm")
 }
+
+
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+# Proof a new metogology spliting data time serie  ---- using 
+
+# .------..------..------..------..------.
+# |P.--. ||R.--. ||O.--. ||O.--. ||F.--. |
+# | :/\: || :(): || :/\: || :/\: || :(): |
+# | (__) || ()() || :\/: || :\/: || ()() |
+# | '--'P|| '--'R|| '--'O|| '--'O|| '--'F|
+# `------'`------'`------'`------'`------'
+
+
+##############################################################################
+# Test with orginal data triangular mean.
+
+
+dr <- station
+
+# This function (curve HoltWinters) summarise the time 
+# filter by year and compute HoltWinters - triangular mean. 
+filter_data <- function(dr){
+  
+  # Testing other methodologies...
+  year_pixel <-  dr %>% 
+    dplyr::select(day, month , julian, mov) %>% 
+    filter(month %in% 5:8) %>% 
+    dplyr::select(julian, month, mov) %>% 
+    rename(mov_ts = 'mov') %>% 
+    mutate(type = case_when(
+      lag(mov_ts) - mov_ts > 0  & lead(mov_ts) - mov_ts > 0  ~ 1, 
+      lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
+      TRUE ~ 0  ) )  
+  
+  return(year_pixel)}
+
+
+run_for_each_OS <- function(dr){
+  
+  # dr <- station
+  
+  # for(i in 1:36){
+  #   print(paste0('number_', i))
+  # 
+  #   proof <- dr %>%
+  #     nest(-station_N, -Lon, -Lat, -year) %>%
+  #     mutate(data = purrr::map(.x = data, .f = curve_HoltWinters))  %>%
+  #     filter(row_number() == i) %>% dplyr::select(data) %>% unnest
+  # 
+  #   define_two_MSD(proof)
+  # }
+  # 
+  # proof <- dr %>%
+  #   nest(-station_N, -Lon, -Lat, -year) %>%
+  #   mutate(data = purrr::map(.x = data, .f = curve_HoltWinters))  %>%
+  #   filter(row_number() == 8) %>% dplyr::select(data) %>% unnest
+  # 
+  # ggplot(proof, aes(julian, mov_ts, colour = as.factor(type))) + geom_point() + theme_bw()
+  # 
+  # define_two_MSD(proof)
+  
+  
+  
+  MSD_proof <- dr %>% 
+    nest(-station_N, -Lon, -Lat, -year) %>% 
+    mutate(data = purrr::map(.x = data, .f = filter_data), 
+           Two_MSD = purrr::map(.x = data, .f = define_two_MSD))
+  
+  
+  MSD_proof <- MSD_correction(MSD_proof)
+  return(MSD_proof)}
+
+
+
+
+
+
+MSD_tO <- new_JointCS %>% 
+  dplyr::select(-NA_percent, -data_filling) %>% 
+  mutate(id = 1:nrow(.)) %>% 
+  unnest %>% 
+  dplyr::select(-prec_R, -mov_R) %>% 
+  nest(-id)
+
+
+
+# Aquí se corre la canicula por estaciones. 
+test_o <- MSD_tO %>%  # filter(row_number() == 6) %>%
+  mutate(MSD = purrr::map(.x = data, .f = run_for_each_OS)) %>%
+  dplyr::select(MSD) %>%
+  unnest
+
+
+test1_O <- test_o %>%
+  rename(x = 'Lon', y = 'Lat') %>%
+  dplyr::select( station_N, x,  y , length) %>%
+  group_by(station_N,  x,  y) %>%
+  summarise(NA_p = (sum(is.na(length))/36)*100, count_NA = sum(is.na(length))) %>%
+  mutate(na_cat = case_when(
+    NA_p < 10 ~ '[0-10) %',
+    NA_p < 20 & NA_p >= 10 ~ '[10-20) %',
+    NA_p < 30 & NA_p >= 20 ~ '[20-30) %',
+    NA_p >= 30 ~ '30% +'))
+
+
+p <- ggplot(test1_O)  + 
+  geom_point(aes(x = x, y =  y, colour = NA_p)) +
+  scale_colour_viridis(na.value="white",  direction = -1) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
+
+
+q <- ggplot(test1_O)  + 
+  geom_point(aes(x = x, y =  y, colour = na_cat)) +
+  scale_colour_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
+
+
+out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/original_data/'
+
+gridExtra::grid.arrange(p, q, ncol = 2)
+
+write.csv(test_o, glue::glue('{out_folder}O_TM_MSD.csv'))
+
+
+
+
+
+
+
+
+
+
+
+
+# =-=-=-=-=-=-=
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
