@@ -1380,20 +1380,33 @@ canicula_after <- function(local_max, mins, maxs){
   for(i in 1:nrow_base){
     # print(i) ; print(j)
     
-    cat(glue::glue('(i = {i} ; j = {j}) '))
+    # cat(glue::glue('(i = {i} ; j = {j}) '))
     varname <- glue::glue('sub{j}L')
+    varname1 <- glue::glue('jul{j}L')
     
     min_after <- min_after %>% 
-      mutate(!!varname := mov_ts - lead(mov_ts, n = j)) 
+      mutate(!!varname := mov_ts - lead(mov_ts, n = j), 
+             !!varname1 := lead(julian, n = j) - julian) 
     
     j <-  (2*i) + 1 }
   
   # Here we extract the second local max. 
-  min_after <- min_after %>% 
+  
+  jul_sub <- min_after %>%
     filter(type == 1)  %>% 
-    gather(type, value, -julian, -month, -mov_ts, -type) %>% 
-    arrange(value) %>% 
-    slice(1)
+    select(julian, month, mov_ts, type, contains('jul'))  %>% 
+    gather(type, jul_sub, -julian, -month, -mov_ts, -type) %>% 
+    mutate(type = str_replace(type, 'jul', 'sub'))
+  
+  min_after <- min_after %>% 
+      filter(type == 1)  %>% 
+      gather(type, value, -julian, -month, -mov_ts, -type) %>% 
+      right_join(. , jul_sub) %>% 
+      filter(jul_sub > 5) %>% 
+      arrange(value)  %>% 
+      slice(1) %>% 
+    dplyr::select(-contains('jul_'))
+    
   
   # If we find min... do second max and canicula. 
   # In other case only create canicula with data NA.
@@ -1438,7 +1451,7 @@ canicula_before <- function(local_max, mins, maxs){
   for(i in 1:nrow_base){
     # print(i) ; print(j)
     
-    cat(glue::glue('(i = {i} ; j = {j}) '))
+    # cat(glue::glue('(i = {i} ; j = {j}) '))
     varname <- glue::glue('sub{j}L')
     
     min_b <- min_b %>% 
@@ -2111,7 +2124,7 @@ by_id_o <- function(MSD_Local, id_pixel){
 
 tictoc::tic()
 test1_o <-  prueba_o %>%
-  # filter(row_number() == 1) %>% 
+  # filter(row_number() >4) %>% 
   mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id_o))
 tictoc::toc() # 1.37 h
 # by_id(MSD_Local = test1$data[[1]], id_pixel = test1$id)
