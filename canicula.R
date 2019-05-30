@@ -84,29 +84,29 @@ nc_chirps <- ncdf4::nc_open(route)
 
 
 # Create a tibble with all dates and raster layers like tables. 
-# tictoc::tic()
-# Prec_table <- tibble(layer = 1:nc_chirps$dim$T$len) %>% 
-#   mutate(date = make_date(1982,1,1) + (layer-1), julian = yday(date), 
-#          year = year(date), month = month(date)) %>%  
-#   # filter(row_number() < 2) %>% 
-#   mutate(raster = purrr::map(.x = layer, 
-#                              .f = function(.x){ HND[[.x]] %>% 
-#                                  rasterToPoints(.) %>% 
-#                                  data.frame() %>% 
-#                                  set_names('x', 'y', 'prec') %>% 
-#                                  mutate(id = 1:nrow(.))} ))
-# tictoc::toc()
+tictoc::tic()
+Prec_table <- tibble(layer = 1:nc_chirps$dim$T$len) %>%
+  mutate(date = make_date(1982,1,1) + (layer-1), julian = yday(date),
+         year = year(date), month = month(date)) %>%
+  # filter(row_number() < 2) %>%
+  mutate(raster = purrr::map(.x = layer,
+                             .f = function(.x){ HND[[.x]] %>%
+                                 rasterToPoints(.) %>%
+                                 data.frame() %>%
+                                 set_names('x', 'y', 'prec') %>%
+                                 mutate(id = 1:nrow(.))} ))
+tictoc::toc()
 # 728.19 sec = 12.1365
 
 
 
 
 # Do moving triangular average Filter - by year and pixel. 
-# id_year_prec <- Prec_table %>% 
-#   unnest  %>%
-#   nest(-year, -id)  %>% 
-#   mutate(data = purrr::map(.x = data, .f = function(.x){ data <- .x %>% 
-#       mutate(mov = movavg(x = prec, n = 31, type = 't')) })) 
+id_year_prec <- Prec_table %>%
+  unnest  %>%
+  nest(-year, -id)  %>%
+  mutate(data = purrr::map(.x = data, .f = function(.x){ data <- .x %>%
+      mutate(mov = movavg(x = prec, n = 31, type = 't')) }))
 # n = 30, atlas de canicula... (introduccion)... But in the other papers said 31 days.
 
 
@@ -771,6 +771,7 @@ Honduras_art <- tibble(x = -c(87.65, 87.15, 87.22), y = c(13.29, 13.32,14.06))
 
 
 
+
 ######### en prueba... 
 
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
@@ -1400,6 +1401,7 @@ canicula_after <- function(local_max, mins, maxs){
   
   min_after <- min_after %>% 
       filter(type == 1)  %>% 
+      select(julian, month, mov_ts, type, contains('sub')) %>% 
       gather(type, value, -julian, -month, -mov_ts, -type) %>% 
       right_join(. , jul_sub) %>% 
       filter(jul_sub > 5) %>% 
@@ -1453,19 +1455,30 @@ canicula_before <- function(local_max, mins, maxs){
     
     # cat(glue::glue('(i = {i} ; j = {j}) '))
     varname <- glue::glue('sub{j}L')
+    varname1 <- glue::glue('jul{j}L')
     
     min_b <- min_b %>% 
-      mutate(!!varname := mov_ts - lag(mov_ts, n = j)) 
+      mutate(!!varname := mov_ts - lag(mov_ts, n = j), 
+             !!varname1 := julian - lag(julian, n = j)) 
     
     j <-  (2*i) + 1 }
   
   
-  # This is the minimum before the final maximum.
-  min_b <-  min_b %>% 
-    filter(type == 1) %>% 
+  jul_sub <- min_b %>%
+    filter(type == 1)  %>% 
+    select(julian, month, mov_ts, type, contains('jul'))  %>% 
+    gather(type, jul_sub, -julian, -month, -mov_ts, -type) %>% 
+    mutate(type = str_replace(type, 'jul', 'sub'))
+  
+  min_b <- min_b %>% 
+    filter(type == 1)  %>% 
+    select(julian, month, mov_ts, type, contains('sub')) %>% 
     gather(type, value, -julian, -month, -mov_ts, -type) %>% 
-    arrange(value) %>% 
-    slice(1)
+    right_join(. , jul_sub) %>% 
+    filter(jul_sub > 5) %>% 
+    arrange(value)  %>% 
+    slice(1) %>% 
+    dplyr::select(-contains('jul_'))
   
   
   # If we find min... do first max and canicula. 
@@ -1482,13 +1495,13 @@ canicula_before <- function(local_max, mins, maxs){
       filter(num == min_b$type)
     
     # Here we create the final object...
-    canicula_after <- tibble(start_date = ini_max$julian, min_date = min_b$julian, 
+    canicula_before <- tibble(start_date = ini_max$julian, min_date = min_b$julian, 
                              end_date = local_max$julian, length = end_date - start_date)
   }else{
-    canicula_after <- tibble(start_date = NA, min_date = NA, end_date = NA, length = NA)
+    canicula_before <- tibble(start_date = NA, min_date = NA, end_date = NA, length = NA)
   }
   
-  return(canicula_after)}
+  return(canicula_before)}
 
 # jmm <- curve_HoltWinters(year_to = 2010)
 
@@ -1547,8 +1560,10 @@ dif_mean <- function(f){
   b <- filter(f, dates == 'min_date')$mov_ts
   c <- filter(f, dates == 'end_date')$mov_ts
   
-  mean_dif <- ((a-b) + (c-b))/2
-  return(mean_dif)}
+  # mean_dif <- ((a-b) + (c-b) + abs(a-c))/3
+  median_dif <- median(c((a-b), (c-b), abs(a-c)))
+  # return(mean_dif)
+  return(median_dif)}
 
 # This function identify MSD between MSD before and after. 
 One_MSD <- function(MSD1, data){
@@ -1913,7 +1928,7 @@ for(i in 1982:2017){
 # Test with orginal data triangular mean.
 
 
-dr <- station
+# dr <- station
 
 # This function (curve HoltWinters) summarise the time 
 # filter by year and compute HoltWinters - triangular mean. 
@@ -1996,7 +2011,8 @@ test1_O <- test_o %>%
   summarise(NA_p = (sum(is.na(length))/36)*100, count_NA = sum(is.na(length))) %>%
   mutate(na_cat = case_when(
     NA_p < 10 ~ '[0-10) %',
-    NA_p < 20 & NA_p >= 10 ~ '[10-20) %',
+    NA_p < 15 & NA_p >= 10 ~ '[10-15) %',
+    NA_p < 20 & NA_p >= 15 ~ '[15-20) %',
     NA_p < 30 & NA_p >= 20 ~ '[20-30) %',
     NA_p >= 30 ~ '30% +'))
 
@@ -2023,7 +2039,7 @@ out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought
 
 gridExtra::grid.arrange(p, q, ncol = 2)
 
-write.csv(test_o, glue::glue('{out_folder}O_TM_MSD.csv'))
+write.csv(test_o, glue::glue('{out_folder}O_TM_MSD_Median.csv'))
 
 
 
@@ -2124,7 +2140,7 @@ by_id_o <- function(MSD_Local, id_pixel){
 
 tictoc::tic()
 test1_o <-  prueba_o %>%
-  # filter(row_number() >4) %>% 
+  filter(row_number() > 2) %>% 
   mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id_o))
 tictoc::toc() # 1.37 h
 # by_id(MSD_Local = test1$data[[1]], id_pixel = test1$id)
@@ -2138,4 +2154,127 @@ tictoc::toc() # 1.37 h
 
 
 
+# +-+ +-+ +-+ +-+ +-+ +-+   +-+   +-+ +-+ +-+ +-+
+# |C| |h| |i| |r| |p| |s|   |-|   |T| |e| |s| |t|
+# +-+ +-+ +-+ +-+ +-+ +-+   +-+   +-+ +-+ +-+ +-+
 
+chirps_p <- id_year_prec %>% 
+  unnest %>% 
+  mutate(station_N = id) %>% 
+  rename(day = 'date',  Lon = 'x', Lat = 'y') %>% 
+  nest(-id)
+
+
+
+station <- chirps_p %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
+
+
+# Aquí se corre la canicula por estaciones. 
+tictoc::tic()
+Chirps_MSD <- chirps_p %>%  # filter(row_number() == 6) %>%
+  mutate(MSD = purrr::map(.x = data, .f = run_for_each_OS)) %>%
+  dplyr::select(MSD) %>%
+  unnest
+tictoc::toc() # 9.81
+
+
+
+
+
+
+
+test1_Chirps <- Chirps_MSD %>%
+  rename(x = 'Lon', y = 'Lat') %>%
+  dplyr::select( station_N, x,  y , length) %>%
+  group_by(station_N,  x,  y) %>%
+  summarise(NA_p = (sum(is.na(length))/37)*100, count_NA = sum(is.na(length))) %>%
+  mutate(na_cat = case_when(
+    NA_p < 10 ~ '[0-10) %',
+    NA_p < 15 & NA_p >= 10 ~ '[10-15) %',
+    NA_p < 20 & NA_p >= 15 ~ '[15-20) %',
+    NA_p < 30 & NA_p >= 20 ~ '[20-30) %',
+    NA_p >= 30 ~ '30% +'))
+
+
+p <- ggplot(test1_Chirps)  + 
+  geom_tile(aes(x = x, y =  y, fill = NA_p)) +
+  scale_fill_viridis(na.value="white",  direction = -1) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
+
+
+q <- ggplot(test1_Chirps)  + 
+  geom_tile(aes(x = x, y =  y, fill = na_cat)) +
+  scale_fill_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
+
+
+
+out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/Chirps_results/original/'
+gridExtra::grid.arrange(p, q, ncol = 2)
+
+write.csv(Chirps_MSD, glue::glue('{out_folder}Chirps_MSD_Median.csv'))
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=
+
+prueba_chirps <- chirps_p %>% 
+  unnest() %>% 
+  nest(-station_N, -Lon, -Lat, -year) %>% 
+  mutate(data_curve = purrr::map(.x = data, .f = data_Oy))
+
+
+
+Chirps_o <- Chirps_MSD %>% 
+  mutate(year_to = year) %>% 
+  nest(-Lon, -Lat, -year) %>% 
+  rename(MSD = 'data')
+
+
+prueba_chirps <- prueba_chirps %>%
+  dplyr::select(-data) %>% 
+  # filter(id == 1, year == 1982) %>%
+  inner_join(Chirps_o, .)
+
+
+
+
+prueba_chirps <- prueba_chirps %>% 
+  # filter(id == 1)  %>% 
+  mutate(id = station_N) %>% 
+  dplyr::select(id, MSD, data_curve) %>% 
+  nest(-id )
+
+
+
+by_id_o <- function(MSD_Local, id_pixel){
+  # MSD_Local <- prueba_o %>%  filter(id == 2) %>% dplyr::select(data) %>% unnest
+  
+  # MSD_Local <- unnest(MSD_Local)
+  
+  
+  img <- image_graph(1200, 680, res = 96)
+  out <- purrr::map2(.x = MSD_Local$MSD,
+                     .y = MSD_Local$data_curve,
+                     .f = Individual_graph_o)
+  dev.off()
+  
+  animation <- magick::image_animate(img, fps = 0.5)
+  # print(animation)
+  image_write(animation, glue::glue("Drought/Station_R/Chirps_results/original/id_{id_pixel}.gif"))
+}
+
+
+tictoc::tic()
+test1_chirps <-  prueba_chirps %>%
+  # filter(row_number() > 2) %>% 
+  mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id_o))
+tictoc::toc() # 1.37 h
