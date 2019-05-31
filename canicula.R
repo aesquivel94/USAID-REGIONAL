@@ -1586,7 +1586,8 @@ One_MSD <- function(MSD1, data){
     nest(-type) %>% 
     mutate(dif = purrr::map(.x = data, .f = dif_mean)) %>% 
     unnest(dif) %>% 
-    arrange(desc(dif)) %>% 
+    # arrange(desc(dif)) %>% 
+    arrange(dif) %>% 
     filter(row_number() == 1)
   
   return(MSD)}
@@ -2165,8 +2166,7 @@ chirps_p <- id_year_prec %>%
   nest(-id)
 
 
-
-station <- chirps_p %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
+# station <- chirps_p %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
 
 
 # Aquí se corre la canicula por estaciones. 
@@ -2176,9 +2176,6 @@ Chirps_MSD <- chirps_p %>%  # filter(row_number() == 6) %>%
   dplyr::select(MSD) %>%
   unnest
 tictoc::toc() # 9.81
-
-
-
 
 
 
@@ -2218,9 +2215,11 @@ q <- ggplot(test1_Chirps)  +
 out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/Chirps_results/original/'
 gridExtra::grid.arrange(p, q, ncol = 2)
 
-write.csv(Chirps_MSD, glue::glue('{out_folder}Chirps_MSD_Median.csv'))
+write.csv(Chirps_MSD, glue::glue('{out_folder}Chirps_MSD_Median_min.csv'))
 
 
+# chirps_p %>% unnest() %>% 
+#   write.csv(glue::glue('{out_folder}data.csv'))
 
 
 
@@ -2254,7 +2253,7 @@ prueba_chirps <- prueba_chirps %>%
   nest(-id )
 
 
-
+# Don't run this.
 by_id_o <- function(MSD_Local, id_pixel){
   # MSD_Local <- prueba_o %>%  filter(id == 2) %>% dplyr::select(data) %>% unnest
   
@@ -2277,4 +2276,45 @@ tictoc::tic()
 test1_chirps <-  prueba_chirps %>%
   # filter(row_number() > 2) %>% 
   mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id_o))
-tictoc::toc() # 1.37 h
+tictoc::toc() # Aun no tenenmos estimado de tiempo total por id. 
+
+
+
+
+#################################
+# Individual graphs...
+
+# Data_index <- prueba_chirps %>% unnest %>% filter(row_number() == 1) %>% dplyr::select(MSD) %>% unnest
+# Data <- prueba_chirps %>% unnest %>% filter(row_number() == 1) %>% dplyr::select(data_curve) %>% unnest
+Igraph_save <- function(Data_index, Data){
+  x <- Data %>% slice(1, 30) %>% .$julian
+  
+  
+  p <- ggplot(Data) +
+    geom_point(aes(julian, mov_ts, colour = as.factor(type))) + 
+    geom_line(aes(julian, mov_ts)) +
+    annotate("rect", xmin=x[1], xmax=x[2], ymin=-Inf, ymax=Inf, alpha = .1)  +
+    labs(x = 'Julian day', y = "Triangular Average (mm)", colour = '') +
+    geom_vline( xintercept = c(Data_index$start_date, Data_index$end_date), 
+                linetype=4, colour = 'blue') +
+    geom_vline(xintercept = Data_index$min_date,  linetype=4, colour = 'turquoise2') +
+    labs(title = glue::glue('Id {Data_index$station_N} --- year {Data_index$year_to}')) +
+    scale_colour_manual(values = c('gray', 'blue', 'red'), 
+                        breaks = c("0", "1", "2"), 
+                        labels = c('Normal', 'Local_Min', 'Local_Max')) +
+    theme_bw() 
+  
+  
+  ggsave(glue::glue("Drought/Station_R/Chirps_results/original/png/id_{Data_index$station_N}_{Data_index$year_to}.png"), 
+         width = 8, height = 4)
+  
+}
+
+
+tictoc::tic()
+prueba_chirps %>% 
+  unnest %>% 
+  mutate(graphs = purrr::map2(.x = MSD, .y = data_curve, .f = Igraph_save))
+tictoc::toc()
+
+
