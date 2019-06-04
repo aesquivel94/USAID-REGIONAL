@@ -2159,6 +2159,8 @@ tictoc::toc() # 1.37 h
 # |C| |h| |i| |r| |p| |s|   |-|   |T| |e| |s| |t|
 # +-+ +-+ +-+ +-+ +-+ +-+   +-+   +-+ +-+ +-+ +-+
 
+out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/Chirps_results/original/'
+
 chirps_p <- id_year_prec %>% 
   unnest %>% 
   mutate(station_N = id) %>% 
@@ -2166,8 +2168,16 @@ chirps_p <- id_year_prec %>%
   nest(-id)
 
 
-# station <- chirps_p %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
 
+# read_chirps <- 
+data_C <- read_csv("Drought/Station_R/Chirps_results/original/data.csv")
+
+chirps_p <- data %>% 
+  dplyr::select(-X1) %>% 
+  nest(-id)
+
+
+# station <- chirps_p %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
 
 # Aquí se corre la canicula por estaciones. 
 tictoc::tic()
@@ -2212,10 +2222,10 @@ q <- ggplot(test1_Chirps)  +
 
 
 
-out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/Chirps_results/original/'
-gridExtra::grid.arrange(p, q, ncol = 2)
 
-write.csv(Chirps_MSD, glue::glue('{out_folder}Chirps_MSD_Median_min.csv'))
+gridExtra::grid.arrange(p, q, ncol = 2)
+# write.csv(Chirps_MSD, glue::glue('{out_folder}Chirps_MSD_Median_min.csv'))
+
 
 
 # chirps_p %>% unnest() %>% 
@@ -2313,8 +2323,188 @@ Igraph_save <- function(Data_index, Data){
 
 tictoc::tic()
 prueba_chirps %>% 
+  filter(id < 11) %>% 
   unnest %>% 
   mutate(graphs = purrr::map2(.x = MSD, .y = data_curve, .f = Igraph_save))
 tictoc::toc()
+
+
+
+
+
+
+
+
+# Chirps_MSD1 <-  Chirps_MSD
+
+
+
+
+
+
+
+
+# Here we will do step 3. 
+# This function find the canicula when the general local maximo is canicula's start.
+canicula_after <- function(local_max, mins, maxs){
+  # local_max <- GL_max; mins <- min; maxs <- max
+  
+  # Step 3. Find the minimum ... possible.
+  
+  # This computes all possible local min after general local max. 
+  min_after <- mins %>% 
+    filter(julian > local_max$julian)
+  
+  # This line join max with mins in one tibble. 
+  base_filter_Ind <- bind_rows(min_after, maxs) %>%
+    dplyr::select(-testing) %>%
+    arrange(julian) %>% # Here i change this. 
+    mutate(dif = julian - local_max$julian) %>% 
+    filter(dif > 5) %>% 
+    dplyr::select(-dif) %>%
+    bind_rows(local_max, .)
+  
+  # This line calculate the number of rows... that the dataset has.
+  nrow_base <- nrow(min_after)
+  
+  # making the arrangement or trap to add mutates.
+  min_after <- base_filter_Ind %>%
+    filter(row_number() > 1) 
+  
+
+  
+  # add mutates.
+  j <- 1 
+  for(i in 1:nrow_base){
+    # print(i) ; print(j)
+    
+    # cat(glue::glue('(i = {i} ; j = {j}) '))
+    varname <- glue::glue('sub{j}L')
+    varname1 <- glue::glue('jul{j}L')
+    
+    min_after <- min_after %>% 
+      mutate(!!varname := mov_ts - lead(mov_ts, n = j), 
+             !!varname1 := lead(julian, n = j) - julian) 
+    
+    j <-  (2*i) + 1 }
+  
+  # Here we extract the second local max. 
+  
+  jul_sub <- min_after %>%
+    filter(type == 1)  %>% 
+    select(julian, month, mov_ts, type, contains('jul'))  %>% 
+    gather(type, jul_sub, -julian, -month, -mov_ts, -type) %>% 
+    mutate(type = str_replace(type, 'jul', 'sub'))
+  
+  min_after <- min_after %>%
+    filter(type == 1)  %>% 
+    select(julian, month, mov_ts, type, contains('sub')) %>% 
+    gather(type, value, -julian, -month, -mov_ts, -type) %>% 
+    right_join(. , jul_sub) %>% 
+    filter(jul_sub > 5) %>% 
+    arrange(value)  %>% 
+    filter(value < 0) %>% # Here i change this line. 
+    slice(1) %>% 
+    dplyr::select(-contains('jul_'))
+  
+  
+  # If we find min... do second max and canicula. 
+  # In other case only create canicula with data NA.
+  if(nrow(min_after) != 0){
+    # Ok this line select the second max.     
+    second_max <- maxs %>% 
+      filter(julian > min_after$julian) %>% 
+      mutate(num = paste0( 'sub', seq(1, (2*(nrow(.)-1) + 1), by = 2), 'L')) %>% 
+      filter(num == min_after$type)
+    
+    # (2*(1-1) + 1) ; (2*(2-1) + 1) ; (2*(3-1) + 1) ; (2*(4-1) + 1)
+    # Here we create the final object...
+    canicula_after <- tibble(start_date = local_max$julian, min_date = min_after$julian, 
+                             end_date = second_max$julian, length = end_date - start_date)
+  }else{
+    canicula_after <- tibble(start_date = NA, min_date = NA, end_date = NA, length = NA)
+  }
+  
+  return(canicula_after)}
+
+# Step 4. Here we will do step 4. The idea it's run before_canicula function.  
+canicula_before <- function(local_max, mins, maxs){
+  # local_max <- GL_max; mins <- min; maxs <- max
+  
+  
+  # Step 4. Find the minimum ... possible. 
+  min_before <- mins %>% 
+    filter(julian < local_max$julian)
+  
+  # This line join max with mins in one tibble.  
+  min_b <- bind_rows(min_before, maxs) %>%
+    dplyr::select(-testing) %>%
+    arrange(julian) %>% # Here i change this. 
+    mutate(dif = local_max$julian - julian)  %>% 
+    filter(dif > 5)  %>% 
+    dplyr::select(-dif) %>%
+    bind_rows(., local_max)
+  
+  
+  # This line calculate the number of rows... that the dataset has.
+  nrow_base <- nrow(min_before)
+  
+  # making the arrangement or trap to add mutates.
+  # =-=-=-=-=-=
+  j <- 1 
+  for(i in 1:nrow_base){
+    # print(i) ; print(j)
+    
+    # cat(glue::glue('(i = {i} ; j = {j}) '))
+    varname <- glue::glue('sub{j}L')
+    varname1 <- glue::glue('jul{j}L')
+    
+    min_b <- min_b %>% 
+      mutate(!!varname := mov_ts - lag(mov_ts, n = j), 
+             !!varname1 := julian - lag(julian, n = j)) 
+    
+    j <-  (2*i) + 1 }
+  
+  
+  jul_sub <- min_b %>%
+    filter(type == 1)  %>% 
+    select(julian, month, mov_ts, type, contains('jul'))  %>% 
+    gather(type, jul_sub, -julian, -month, -mov_ts, -type) %>% 
+    mutate(type = str_replace(type, 'jul', 'sub'))
+  
+  min_b <- min_b %>% 
+    filter(type == 1)  %>% 
+    select(julian, month, mov_ts, type, contains('sub')) %>% 
+    gather(type, value, -julian, -month, -mov_ts, -type) %>% 
+    right_join(. , jul_sub) %>% 
+    filter(jul_sub > 5) %>% 
+    arrange(value)  %>% 
+    filter(value < 0) %>% # Here i change this line. 
+    slice(1) %>% 
+    dplyr::select(-contains('jul_'))
+  
+  
+  # If we find min... do first max and canicula. 
+  # In other case only create canicula with data NA.
+  if(nrow(min_b) != 0){
+    
+    
+    # seq(1, (2*(nrow(.)-1) + 1), by = 2)
+    
+    ini_max <- maxs %>% 
+      filter(julian < min_b$julian) %>% 
+      # mutate(num = paste0( 'sub',rev(1:nrow(.)), 'L')) %>%
+      mutate(num = paste0( 'sub', rev(seq(1, (2*(nrow(.)-1) + 1), by = 2)), 'L')) %>%
+      filter(num == min_b$type)
+    
+    # Here we create the final object...
+    canicula_before <- tibble(start_date = ini_max$julian, min_date = min_b$julian, 
+                              end_date = local_max$julian, length = end_date - start_date)
+  }else{
+    canicula_before <- tibble(start_date = NA, min_date = NA, end_date = NA, length = NA)
+  }
+  
+  return(canicula_before)}
+
 
 
