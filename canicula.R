@@ -2159,20 +2159,20 @@ tictoc::toc() # 1.37 h
 # |C| |h| |i| |r| |p| |s|   |-|   |T| |e| |s| |t|
 # +-+ +-+ +-+ +-+ +-+ +-+   +-+   +-+ +-+ +-+ +-+
 
-out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/Chirps_results/original/'
+out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/Chirps_results/original/png_dif_1/'
 
-chirps_p <- id_year_prec %>% 
-  unnest %>% 
-  mutate(station_N = id) %>% 
-  rename(day = 'date',  Lon = 'x', Lat = 'y') %>% 
-  nest(-id)
+# chirps_p <- id_year_prec %>% 
+#   unnest %>% 
+#   mutate(station_N = id) %>% 
+#   rename(day = 'date',  Lon = 'x', Lat = 'y') %>% 
+#   nest(-id)
 
 
 
 # read_chirps <- 
 data_C <- read_csv("Drought/Station_R/Chirps_results/original/data.csv")
 
-chirps_p <- data %>% 
+chirps_p <- data_C %>% 
   dplyr::select(-X1) %>% 
   nest(-id)
 
@@ -2224,7 +2224,7 @@ q <- ggplot(test1_Chirps)  +
 
 
 gridExtra::grid.arrange(p, q, ncol = 2)
-# write.csv(Chirps_MSD, glue::glue('{out_folder}Chirps_MSD_Median_min.csv'))
+write.csv(Chirps_MSD, glue::glue('{out_folder}Chirps_MSD_Median_min.csv'))
 
 
 
@@ -2315,7 +2315,7 @@ Igraph_save <- function(Data_index, Data){
     theme_bw() 
   
   
-  ggsave(glue::glue("Drought/Station_R/Chirps_results/original/png/id_{Data_index$station_N}_{Data_index$year_to}.png"), 
+  ggsave(glue::glue("Drought/Station_R/Chirps_results/original/png_dif_1/id_{Data_index$station_N}_{Data_index$year_to}.png"), 
          width = 8, height = 4)
   
 }
@@ -2506,5 +2506,195 @@ canicula_before <- function(local_max, mins, maxs){
   
   return(canicula_before)}
 
+# data <- chirps_p %>% 
+#   filter(id == 2 ) %>% 
+#   unnest() %>% 
+#   nest(-station_N, -Lon, -Lat, -year)  %>% 
+#   mutate(data = purrr::map(.x = data, .f = filter_data)) %>% 
+#   filter(year == 1991) %>% 
+#   dplyr::select(data) %>% 
+#   unnest()
 
 
+define_two_MSD <- function(data){
+  # data <- jmm
+  # First step: define general local maximum and 
+  # filter minimums that do not have a maximum next or before.
+  
+  #Note: I think it's important compute time series maximum and include if that is possible.
+  
+  # Compute 
+  max <- filter(data, type == 2)
+  
+  # For Now we don't use this information on next step. 
+  # max_G <- filter(data, row_number() == which.max(data$mov_ts))
+  
+  # This line filter minimums local 
+  # when doesn't have local max before or next.  
+  min <- filter(data, type == 1) %>%
+    mutate(testing = case_when(
+      julian < max$julian[1] ~ 1,
+      julian > last(max$julian) ~ 2,
+      TRUE ~ 0)) %>%
+    filter(testing ==  0)
+  
+  #  Step 2. Compute the max of local_max.
+  GL_max <- max %>%
+    arrange(desc(mov_ts)) %>%
+    slice(1)
+  
+  if(nrow(GL_max) == 1){
+    # Step 3. Here we will do step 3. The idea it's run after_canicula function. 
+    canicula_A <- canicula_after(local_max = GL_max, mins = min, maxs = max)
+    # Step 4. Here we will do step 4. The idea it's run before_canicula function.  
+    canicula_B <- canicula_before(local_max = GL_max, mins = min, maxs = max)
+    
+    # Step_5. Here we join two MSD. 
+    MSD_two_sides <- bind_rows(canicula_A, canicula_B) %>%
+      mutate(type = c('A', 'B')) %>%
+      dplyr::select(type, start_date, min_date, end_date, length)  
+  }else{
+    MSD_two_sides <- tibble(type = 'N', start_date = NA, min_date = min$julian, end_date = NA, length = NA) %>% 
+      bind_rows(tibble(type = 'N', start_date = NA, min_date = min$julian, end_date = NA, length = NA), .)
+  }
+  
+  
+  return(MSD_two_sides)}
+
+
+# here we subtract the maximum - minimum of the MSD and then we averaged the differences.
+dif_mean <- function(f){
+  a <- filter(f, dates == 'start_date')$mov_ts
+  b <- filter(f, dates == 'min_date')$mov_ts
+  c <- filter(f, dates == 'end_date')$mov_ts
+  
+  # mean_dif <- ((a-b) + (c-b) + abs(a-c))/3
+  median_dif <- median(c((a-b), (c-b), abs(a-c)))
+  # return(mean_dif)
+  return(median_dif)}
+
+# This function identify MSD between MSD before and after. 
+One_MSD <- function(MSD1, data){
+  
+  # MSD1 <- MSD_two_sides
+  
+  # r <- 6
+  # data <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%
+  # filter(row_number() == r) %>% dplyr::select(data) %>% unnest()
+  # MSD1 <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%
+  #   filter(row_number() == r) %>% dplyr::select(Two_MSD) %>% unnest()
+  
+  # data1 %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + 
+  #   theme_bw()+ geom_vline(xintercept = as.numeric(MSD1[1, 2:4]), col = 'red') + 
+  #   geom_vline(xintercept = as.numeric(MSD1[2, 2:4]), col = 'blue') 
+  
+  MSD <-  MSD1 %>%
+    dplyr::select(-length) %>% 
+    gather(dates, julian, -type) %>% 
+    mutate(mov_ts = purrr::map(.x = julian, .f = function(.x){data %>% filter(julian == .x) %>% .$mov_ts}) ) %>% 
+    unnest(mov_ts)  %>% 
+    nest(-type) %>% 
+    mutate(dif = purrr::map(.x = data, .f = dif_mean)) %>% 
+    unnest(dif) %>% 
+    # arrange(desc(dif)) %>% 
+    arrange(dif) 
+  
+  MSD_F <- MSD %>% 
+    filter(dif > 1) %>%
+    filter(row_number() == 1)
+  
+  MSD <- if(nrow(MSD_F) < 1){filter(MSD, row_number() == 1)}else{MSD_F}
+
+  return(MSD)}
+
+
+# This function organize the MSD, if we don't identify MSD put type = N, 
+# in the case we own two MSD the function selects one. 
+MSD_correction <- function(MSD_C){
+  
+  # Identify which it's MSD when we have two (what are the cases?)
+  MSD_C1 <- MSD_C %>% 
+    mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>% 
+    unnest(proof) %>% 
+    filter(proof == 2) %>% 
+    mutate(Two_MSD = purrr::map2(.x = Two_MSD, .y = data,.f = One_MSD)) %>% 
+    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>% 
+    unnest %>% 
+    dplyr::select(station_N, Lon, Lat,  year, type)
+  
+  
+  # Extract the MSD selected. 
+  MSD_C1 <- MSD_C %>% 
+    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>%
+    unnest %>% 
+    nest(-station_N, -Lon, -Lat,  -year, -type) %>% 
+    inner_join(MSD_C1, .) %>% 
+    unnest
+  
+  
+  # Change type when we don't identify MSD. 
+  No_MSD <- MSD_C %>%
+    mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>%
+    unnest(proof)  %>%
+    filter(proof == 0) %>% 
+    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>% 
+    unnest %>% 
+    mutate(type = 'N') %>% 
+    unique()
+  
+  # Join all MSD. 
+  MSD <- MSD_C %>%
+    mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>%
+    unnest(proof)  %>%
+    filter(proof == 1) %>% 
+    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>%
+    unnest %>% 
+    na.omit() %>% 
+    bind_rows(MSD_C1, No_MSD, .) %>% 
+    arrange(year)
+  
+  return(MSD)}
+
+
+
+##############################################################################
+filter_data <- function(dr){
+  
+  # Testing other methodologies...
+  year_pixel <-  dr %>% 
+    dplyr::select(day, month , julian, mov) %>% 
+    filter(month %in% 5:8) %>% 
+    dplyr::select(julian, month, mov) %>% 
+    rename(mov_ts = 'mov') %>% 
+    mutate(type = case_when(
+      lag(mov_ts) - mov_ts > 0  & lead(mov_ts) - mov_ts > 0  ~ 1, 
+      lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
+      TRUE ~ 0  ) )  
+  
+  return(year_pixel)}
+
+
+run_for_each_OS <- function(dr){
+  
+  MSD_proof <- dr %>% 
+    nest(-station_N, -Lon, -Lat, -year) %>% 
+    mutate(data = purrr::map(.x = data, .f = filter_data), 
+           Two_MSD = purrr::map(.x = data, .f = define_two_MSD))
+  
+  
+  MSD_proof <- MSD_correction(MSD_proof)
+  return(MSD_proof)}
+
+
+
+data_Oy <- function(data){
+  
+  data_base <- data %>%
+    filter(month %in% 5:8) %>%
+    rename(mov_ts = mov) %>% 
+    dplyr::select(julian, month, mov_ts) %>% 
+    mutate(type = case_when(
+      lag(mov_ts) - mov_ts > 0  & lead(mov_ts) - mov_ts > 0  ~ 1, 
+      lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
+      TRUE ~ 0  ) ) 
+  return(data_base)}
