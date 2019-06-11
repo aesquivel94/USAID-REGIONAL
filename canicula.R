@@ -8,6 +8,7 @@ rm(list = ls()); gc(reset = TRUE)
 # Chirps
 # https://iridl.ldeo.columbia.edu/SOURCES/.UCSB/.CHIRPS/.v2p0/.daily-improved/.global/.0p25/.prcp/X/%2882W%29%2893W%29RANGEEDGES/Y/%2817N%29%2810N%29RANGEEDGES/T/%281%20Jan%201982%29%2831%20Dec%202018%29RANGEEDGES/index.html
 
+# ERSST -- x 130 340 ; y -15 35
 
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 # Packages. 
@@ -2673,7 +2674,6 @@ filter_data <- function(dr){
   
   return(year_pixel)}
 
-
 run_for_each_OS <- function(dr){
   
   MSD_proof <- dr %>% 
@@ -2684,8 +2684,6 @@ run_for_each_OS <- function(dr){
   
   MSD_proof <- MSD_correction(MSD_proof)
   return(MSD_proof)}
-
-
 
 data_Oy <- function(data){
   
@@ -2698,3 +2696,69 @@ data_Oy <- function(data){
       lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
       TRUE ~ 0  ) ) 
   return(data_base)}
+
+
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Do CPT file.
+# =-=-=-=-=-=-=-=-=-=-=-=-=-= 
+ CPT_file <- function(data, var){
+  # data <- MSD_data
+  # var <- 'Intensity'
+   
+    CPT_data <- data %>% 
+     dplyr::select(-id, -data) %>% 
+     unnest %>% 
+     dplyr::select(year, id, !!var) %>% 
+     spread(key = id, value = !!var) 
+    
+   Lat_Long  <- data %>% 
+     dplyr::select(-id, -data) %>% 
+     unnest %>% 
+     dplyr::select(x, y) %>% 
+     unique %>% 
+     t() 
+ 
+   colnames(Lat_Long) <- paste0(1:150)
+   rownames(Lat_Long) <- NULL
+   
+   
+   Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
+   
+   names(Lat_Long) <- c('', paste0('V',1:150))
+   names(CPT_data) <- c('', paste0('V',1:150))
+
+  # =-=-=-=-=-=-=-=-=-=-=-=
+   CPT_data <- CPT_data %>% 
+     mutate_if(is.factor, as.character) %>% 
+     mutate_if(is.character, as.numeric)  %>%
+     rbind(Lat_Long, .) 
+   
+ 
+   file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Chirps_', var, '.txt')
+   
+   
+   sink(file = file)
+   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
+   cat('cpt:nfield=1', sep = '\n')
+   cat(glue("cpt:field=days, cpt:nrow=37, cpt:ncol=150, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
+   cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
+   sink()
+ 
+ }  
+
+# MSD_data %>%
+#   dplyr::select(-id, -data) %>%
+#   unnest
+#  Var <- c(Length, Intensity, Magnitude)
+
+CPT_file(data = MSD_data, var = 'Length')
+# CPT_file(data = MSD_data, var = 'Intensity')
+# CPT_file(data = MSD_data, var = 'Magnitude')
+
+
