@@ -127,17 +127,6 @@ dry_C <- read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Hond
 
 
 
-# p_data  <- MSD_data %>%
-#   dplyr::select(-data, -id)  %>%
-#   unnest %>%
-#   na_if(-999) %>% 
-#   # dplyr::select(year,  x, y, Magnitude ) %>% 
-#   # filter(between(year, 2015, 2018)) %>%
-#   mutate(year = as.integer(year)) 
-# 
-# p_data %>% dplyr::select(year) %>% unique
-
-
 # anim <- ggplot(p_data) +
 #   geom_tile(aes(x, y, fill = Magnitude )) + 
 #   scale_fill_viridis(na.value="white",  direction = -1) + 
@@ -154,215 +143,6 @@ dry_C <- read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Hond
 # anim_save("MSD_Index/Magnitude_Chirps.gif", anim)
 
 
-# =-=-=-=-= Generación de los gif para las series de tiempo. 
-# library(ggplot2)
-
-# MSD_data1 <- MSD_data %>% 
-#   mutate(MSD = purrr::map2(.x = MSD, year,.f = function(.x, .y){
-#     .x <- .x %>% 
-#       mutate(year = .y)
-#   }))
-
-# Individual_graph <- function(Data_index, Data){
-#   # Data_index<- MSD_data1$MSD[[1]]
-#   # Data <- MSD_data1$data[[1]]
-#   
-#   Data_index <- Data_index %>% 
-#     na_if(-999)
-#   
-#   graph <-  Data  %>% 
-#     filter(between(month, 5, 10)) %>% 
-#     ggplot() + 
-#     geom_line(aes(julian, mov)) +
-#     theme_bw() +
-#     labs(x = 'Día Juliano', y = "Promedio Triangular (mm)") + 
-#     geom_vline( xintercept = c(Data_index$Start, Data_index$End), linetype=4, colour = 'blue') +
-#     geom_vline(xintercept = Data_index$Min,  linetype=4, colour = 'skyblue') + 
-#     labs(title = glue::glue('Id {Data_index$id}: Lon {Data_index$x} - Lat {Data_index$y} --- year {Data_index$year}'))
-#   
-#   print(graph)
-# }
-
-
-# by_id <- function(MSD_Local, id_pixel){
-#   # MSD_Local <- MSD_data1 %>%  filter(id == 2)
-# 
-#   img <- image_graph(600, 340, res = 96)
-#   out <- purrr::map2(.x = MSD_Local$MSD, 
-#                      .y = MSD_Local$data, 
-#                      .f = Individual_graph)
-#   dev.off()
-#   
-#   animation <- image_animate(img, fps = 2)
-#   # print(animation)
-#   image_write(animation, glue::glue("MSD_Index/Chirps_series_by_id/id_{id_pixel}.gif"))
-# }
-
-# tictoc::tic()
-# MSD_data1 %>%  
-#   dplyr::select(-year) %>% 
-#   nest(-id) %>% 
-#   mutate(try = purrr::map2(.x = data, .y = id, .f = by_id))
-# tictoc::toc() # 1.47 h
-# rm(MSD_data1)
-
-
-# ### Mean graphs And NA. 
-# # 
-# # Length <- MSD_data %>%
-# #   dplyr::select(-data, -id)  %>%
-# #   unnest %>%
-# #   na_if(-999) %>%
-# #   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
-# #   group_by(id, x, y) %>%
-# #   summarise_all(mean, na.rm = TRUE) %>%
-# #   # gather(Indicator, value, -id, -x, -y) %>%
-# #   ggplot(.) +
-# #   geom_tile(aes(x, y, fill = Length)) +
-# #   scale_fill_viridis(na.value="white",  direction = -1) +
-# #   geom_sf(data = shp, fill = NA, color = gray(.5)) +
-# #   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
-# #   theme_bw() +
-# #   labs(x = 'Longitud', y = 'Latitud', fill = 'Días', title = 'a).')
-# # 
-# # 
-# # Intensity <- MSD_data %>%
-# #   dplyr::select(-data, -id)  %>%
-# #   unnest %>%
-# #   na_if(-999) %>%
-# #   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
-# #   group_by(id, x, y) %>%
-# #   summarise_all(mean, na.rm = TRUE) %>%
-# #   # gather(Indicator, value, -id, -x, -y) %>%
-# #   ggplot(.) +
-# #   geom_tile(aes(x, y, fill = Intensity)) +
-# #   scale_fill_viridis(na.value="white",  direction = -1) +
-# #   geom_sf(data = shp, fill = NA, color = gray(.5)) +
-# #   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
-# #   theme_bw() +
-# #   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'b).')
-# 
-# # Magnitude <- MSD_data %>%
-# #   dplyr::select(-data, -id)  %>%
-# #   unnest %>%
-# #   na_if(-999) %>%
-# #   dplyr::select(-Min, -Start, -End, -End_P, -year) %>%
-# #   group_by(id, x, y) %>%
-# #   summarise_all(mean, na.rm = TRUE) %>%
-# #   # gather(Indicator, value, -id, -x, -y) %>%
-# #   ggplot(.) +
-# #   geom_tile(aes(x, y, fill = Magnitude)) +
-# #   scale_fill_viridis(na.value="white",  direction = -1) +
-# #   geom_sf(data = shp, fill = NA, color = gray(.5)) +
-# #   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
-# #   theme_bw() +
-# #   labs(x = 'Longitud', y = 'Latitud', fill = 'mm', title = 'c).')
-# # 
-# # 
-# # 
-# # gridExtra::grid.arrange(Length, Intensity, Magnitude, ncol = 3)
-
-
-# Mapa de % de NA. 
-
-# MSD_data %>%
-#     dplyr::select(-data, -id)  %>%
-#     unnest %>%
-#     na_if(-999) %>% 
-#   dplyr::select(year, id, x, y, Start) %>% 
-#   group_by(id, x, y) %>% 
-#   summarise_all(funs(sum(is.na(.))/37 * 100)) %>% 
-#   ggplot(.) +
-#   geom_tile(aes(x, y, fill = Start)) +
-#   scale_fill_viridis(na.value="white",  direction = -1) +
-#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
-#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
-#   theme_bw() +
-#   labs(x = 'Longitud', y = 'Latitud', fill = '%NA', title = 'a).')
-
-
-
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-  
-  
-# =-=-=-=-=-=-=-=
-Honduras_art <- tibble(x = -c(87.65, 87.15, 87.22), y = c(13.29, 13.32,14.06))
-
-# a <- MSD_data %>%
-#   dplyr::select(-data, -id) %>%
-#   unnest %>%
-#   group_by(id, x, y) %>% 
-#   summarise(percent = round(sum(Start == -999)/37, 2)*100)   %>% 
-#   filter(percent < 40)
-# 
-# 
-#  # f <-  ggplot(a) +
-#   geom_tile(aes(x, y, fill = percent))  + 
-#   scale_fill_viridis() + 
-#   geom_sf(data = shp, fill = NA, color = gray(.5)) +
-#   geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
-#   theme_bw() + 
-#   labs(x = NULL, y = NULL, fill = 'NA %') + 
-#   geom_point(data = Honduras_art, aes(x, y))
-  
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=
-# Do CPT file.
-# =-=-=-=-=-=-=-=-=-=-=-=-=-= 
-# CPT_file <- function(data, var){
-#  # data <- MSD_data
-#  # var <- 'Intensity'
-#   
-#    CPT_data <- data %>% 
-#     dplyr::select(-id, -data) %>% 
-#     unnest %>% 
-#     dplyr::select(year, id, !!var) %>% 
-#     spread(key = id, value = !!var) 
-#    
-#   Lat_Long  <- data %>% 
-#     dplyr::select(-id, -data) %>% 
-#     unnest %>% 
-#     dplyr::select(x, y) %>% 
-#     unique %>% 
-#     t() 
-# 
-#   colnames(Lat_Long) <- paste0(1:150)
-#   rownames(Lat_Long) <- NULL
-#   
-#   
-#   Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
-#   
-#   names(Lat_Long) <- c('', paste0('V',1:150))
-#   names(CPT_data) <- c('', paste0('V',1:150))
-# 
-# 
-#   
-#   # =-=-=-=-=-=-=-=-=-=-=-=
-#   CPT_data <- CPT_data %>% 
-#     mutate_if(is.factor, as.character) %>% 
-#     mutate_if(is.character, as.numeric)  %>%
-#     rbind(Lat_Long, .) 
-#   
-# 
-#   file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Chirps_', var, '.txt')
-#   
-#   
-#   sink(file = file)
-#   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
-#   cat('cpt:nfield=1', sep = '\n')
-#   cat(glue("cpt:field=days, cpt:nrow=37, cpt:ncol=150, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
-#   cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
-#   sink()
-# 
-# }  
-  
-## MSD_data %>%
-##   dplyr::select(-id, -data) %>%
-##   unnest
-##  Var <- c(Length, Intensity, Magnitude)
-
-# CPT_file(data = MSD_data, var = 'Length')
-# CPT_file(data = MSD_data, var = 'Intensity')
-# CPT_file(data = MSD_data, var = 'Magnitude')
 
 
 
@@ -2354,5 +2134,83 @@ data_Oy <- function(data){
 CPT_file(data = MSD_data, var = 'Length')
 # CPT_file(data = MSD_data, var = 'Intensity')
 # CPT_file(data = MSD_data, var = 'Magnitude')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=
+# Do CPT file.
+# =-=-=-=-=-=-=-=-=-=-=-=-=-= 
+# CPT_file <- function(data, var){
+#  # data <- MSD_data
+#  # var <- 'Intensity'
+#   
+#    CPT_data <- data %>% 
+#     dplyr::select(-id, -data) %>% 
+#     unnest %>% 
+#     dplyr::select(year, id, !!var) %>% 
+#     spread(key = id, value = !!var) 
+#    
+#   Lat_Long  <- data %>% 
+#     dplyr::select(-id, -data) %>% 
+#     unnest %>% 
+#     dplyr::select(x, y) %>% 
+#     unique %>% 
+#     t() 
+# 
+#   colnames(Lat_Long) <- paste0(1:150)
+#   rownames(Lat_Long) <- NULL
+#   
+#   
+#   Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
+#   
+#   names(Lat_Long) <- c('', paste0('V',1:150))
+#   names(CPT_data) <- c('', paste0('V',1:150))
+# 
+# 
+#   
+#   # =-=-=-=-=-=-=-=-=-=-=-=
+#   CPT_data <- CPT_data %>% 
+#     mutate_if(is.factor, as.character) %>% 
+#     mutate_if(is.character, as.numeric)  %>%
+#     rbind(Lat_Long, .) 
+#   
+# 
+#   file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Chirps_', var, '.txt')
+#   
+#   
+#   sink(file = file)
+#   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
+#   cat('cpt:nfield=1', sep = '\n')
+#   cat(glue("cpt:field=days, cpt:nrow=37, cpt:ncol=150, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
+#   cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
+#   sink()
+# 
+# }  
+
+## MSD_data %>%
+##   dplyr::select(-id, -data) %>%
+##   unnest
+##  Var <- c(Length, Intensity, Magnitude)
+
+# CPT_file(data = MSD_data, var = 'Length')
+# CPT_file(data = MSD_data, var = 'Intensity')
+# CPT_file(data = MSD_data, var = 'Magnitude')
+
 
 
