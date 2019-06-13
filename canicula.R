@@ -310,12 +310,14 @@ new_JointCS <-  Joint_CS %>%
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # Proof a new metogology spliting data time serie.
 # From here we compute the MSD for stations. 
-# .------..------..------..------..------.
-# |P.--. ||R.--. ||O.--. ||O.--. ||F.--. |
-# | :/\: || :(): || :/\: || :/\: || :(): |
-# | (__) || ()() || :\/: || :\/: || ()() |
-# | '--'P|| '--'R|| '--'O|| '--'O|| '--'F|
-# `------'`------'`------'`------'`------'
+
+# .------..------..------..------..------..------..------..------..------..------..------.
+# |S.--. ||T.--. ||A.--. ||T.--. ||I.--. ||O.--. ||N.--. ||_.--. ||M.--. ||S.--. ||D.--. |
+# | :/\: || :/\: || (\/) || :/\: || (\/) || :/\: || :(): || :/\: || (\/) || :/\: || :/\: |
+# | :\/: || (__) || :\/: || (__) || :\/: || :\/: || ()() || :\/: || :\/: || :\/: || (__) |
+# | '--'S|| '--'T|| '--'A|| '--'T|| '--'I|| '--'O|| '--'N|| '--'_|| '--'M|| '--'S|| '--'D|
+# `------'`------'`------'`------'`------'`------'`------'`------'`------'`------'`------'
+
 
 ##############################################################################
 # station <- read_csv("Drought/dr.csv")
@@ -361,7 +363,11 @@ canicula_after <- function(local_max, mins, maxs){
   # This line join max with mins in one tibble. 
   base_filter_Ind <- bind_rows(min_after, maxs) %>%
     dplyr::select(-testing) %>%
-    arrange(julian)
+    arrange(julian) %>% # Here i change this. 
+    mutate(dif = julian - local_max$julian) %>% 
+    filter(dif > 5) %>% 
+    dplyr::select(-dif) %>%
+    bind_rows(local_max, .)
   
   # This line calculate the number of rows... that the dataset has.
   nrow_base <- nrow(min_after)
@@ -369,6 +375,8 @@ canicula_after <- function(local_max, mins, maxs){
   # making the arrangement or trap to add mutates.
   min_after <- base_filter_Ind %>%
     filter(row_number() > 1) 
+  
+  
   
   # add mutates.
   j <- 1 
@@ -393,16 +401,17 @@ canicula_after <- function(local_max, mins, maxs){
     gather(type, jul_sub, -julian, -month, -mov_ts, -type) %>% 
     mutate(type = str_replace(type, 'jul', 'sub'))
   
-  min_after <- min_after %>% 
-      filter(type == 1)  %>% 
-      select(julian, month, mov_ts, type, contains('sub')) %>% 
-      gather(type, value, -julian, -month, -mov_ts, -type) %>% 
-      right_join(. , jul_sub) %>% 
-      filter(jul_sub > 5) %>% 
-      arrange(value)  %>% 
-      slice(1) %>% 
+  min_after <- min_after %>%
+    filter(type == 1)  %>% 
+    select(julian, month, mov_ts, type, contains('sub')) %>% 
+    gather(type, value, -julian, -month, -mov_ts, -type) %>% 
+    right_join(. , jul_sub) %>% 
+    filter(jul_sub > 5) %>% 
+    arrange(value)  %>% 
+    filter(value < 0) %>% # Here i change this line. 
+    slice(1) %>% 
     dplyr::select(-contains('jul_'))
-    
+  
   
   # If we find min... do second max and canicula. 
   # In other case only create canicula with data NA.
@@ -412,7 +421,7 @@ canicula_after <- function(local_max, mins, maxs){
       filter(julian > min_after$julian) %>% 
       mutate(num = paste0( 'sub', seq(1, (2*(nrow(.)-1) + 1), by = 2), 'L')) %>% 
       filter(num == min_after$type)
-
+    
     # (2*(1-1) + 1) ; (2*(2-1) + 1) ; (2*(3-1) + 1) ; (2*(4-1) + 1)
     # Here we create the final object...
     canicula_after <- tibble(start_date = local_max$julian, min_date = min_after$julian, 
@@ -435,7 +444,11 @@ canicula_before <- function(local_max, mins, maxs){
   # This line join max with mins in one tibble.  
   min_b <- bind_rows(min_before, maxs) %>%
     dplyr::select(-testing) %>%
-    arrange(julian)
+    arrange(julian) %>% # Here i change this. 
+    mutate(dif = local_max$julian - julian)  %>% 
+    filter(dif > 5)  %>% 
+    dplyr::select(-dif) %>%
+    bind_rows(., local_max)
   
   
   # This line calculate the number of rows... that the dataset has.
@@ -471,6 +484,7 @@ canicula_before <- function(local_max, mins, maxs){
     right_join(. , jul_sub) %>% 
     filter(jul_sub > 5) %>% 
     arrange(value)  %>% 
+    filter(value < 0) %>% # Here i change this line. 
     slice(1) %>% 
     dplyr::select(-contains('jul_'))
   
@@ -478,8 +492,6 @@ canicula_before <- function(local_max, mins, maxs){
   # If we find min... do first max and canicula. 
   # In other case only create canicula with data NA.
   if(nrow(min_b) != 0){
-    
-    
     # seq(1, (2*(nrow(.)-1) + 1), by = 2)
     
     ini_max <- maxs %>% 
@@ -490,7 +502,7 @@ canicula_before <- function(local_max, mins, maxs){
     
     # Here we create the final object...
     canicula_before <- tibble(start_date = ini_max$julian, min_date = min_b$julian, 
-                             end_date = local_max$julian, length = end_date - start_date)
+                              end_date = local_max$julian, length = end_date - start_date)
   }else{
     canicula_before <- tibble(start_date = NA, min_date = NA, end_date = NA, length = NA)
   }
@@ -1141,27 +1153,28 @@ CPT_file_s(data =  MSD_SO, var = 'length')
 
 
 
-# +-+ +-+ +-+ +-+ +-+ +-+   +-+   +-+ +-+ +-+ +-+
-# |C| |h| |i| |r| |p| |s|   |-|   |T| |e| |s| |t|
-# +-+ +-+ +-+ +-+ +-+ +-+   +-+   +-+ +-+ +-+ +-+
 
-out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/Chirps_results/original/png_dif_1/'
+# .------..------..------..------..------..------.     .------..------..------.
+# |C.--. ||H.--. ||I.--. ||R.--. ||P.--. ||S.--. |.-.  |M.--. ||S.--. ||D.--. |
+# | :/\: || :/\: || (\/) || :(): || :/\: || :/\: ((5)) | (\/) || :/\: || :/\: |
+# | :\/: || (__) || :\/: || ()() || (__) || :\/: |'-.-.| :\/: || :\/: || (__) |
+# | '--'C|| '--'H|| '--'I|| '--'R|| '--'P|| '--'S| ((1)) '--'M|| '--'S|| '--'D|
+# `------'`------'`------'`------'`------'`------'  '-'`------'`------'`------'
 
+out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/Chirps/'
+
+# This is in the case if you have id_year_prec onto the system 
 # chirps_p <- id_year_prec %>% 
 #   unnest %>% 
 #   mutate(station_N = id) %>% 
 #   rename(day = 'date',  Lon = 'x', Lat = 'y') %>% 
 #   nest(-id)
 
-
-
-# read_chirps <- 
 data_C <- read_csv("Drought/Station_R/Chirps_results/original/data.csv")
 
 chirps_p <- data_C %>% 
   dplyr::select(-X1) %>% 
   nest(-id)
-
 
 # station <- chirps_p %>% filter(row_number() == 1) %>% dplyr::select(data) %>% unnest
 
@@ -1173,10 +1186,10 @@ Chirps_MSD <- chirps_p %>%  # filter(row_number() == 6) %>%
   unnest
 tictoc::toc() # 9.81
 
+######
 
 
-
-test1_Chirps <- Chirps_MSD %>%
+Chirps_to_graph <- Chirps_MSD %>%
   rename(x = 'Lon', y = 'Lat') %>%
   dplyr::select( station_N, x,  y , length) %>%
   group_by(station_N,  x,  y) %>%
@@ -1189,7 +1202,7 @@ test1_Chirps <- Chirps_MSD %>%
     NA_p >= 30 ~ '30% +'))
 
 
-p <- ggplot(test1_Chirps)  + 
+p <- ggplot(Chirps_to_graph)  + 
   geom_tile(aes(x = x, y =  y, fill = NA_p)) +
   scale_fill_viridis(na.value="white",  direction = -1) + 
   geom_sf(data = shp, fill = NA, color = gray(.5)) +
@@ -1198,7 +1211,7 @@ p <- ggplot(test1_Chirps)  +
   labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
 
 
-q <- ggplot(test1_Chirps)  + 
+q <- ggplot(Chirps_to_graph)  + 
   geom_tile(aes(x = x, y =  y, fill = na_cat)) +
   scale_fill_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
   geom_sf(data = shp, fill = NA, color = gray(.5)) +
@@ -1207,25 +1220,18 @@ q <- ggplot(test1_Chirps)  +
   labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
 
 
-
-
 gridExtra::grid.arrange(p, q, ncol = 2)
 write.csv(Chirps_MSD, glue::glue('{out_folder}Chirps_MSD_Median_min.csv'))
 
-
-
-# chirps_p %>% unnest() %>% 
+# chirps_p %>% unnest() %>%
 #   write.csv(glue::glue('{out_folder}data.csv'))
-
-
 
 # =-=-=-=-=-=-=-=-=-=-=-=
 
-prueba_chirps <- chirps_p %>% 
+Chirps_series <- chirps_p %>% 
   unnest() %>% 
   nest(-station_N, -Lon, -Lat, -year) %>% 
   mutate(data_curve = purrr::map(.x = data, .f = data_Oy))
-
 
 
 Chirps_o <- Chirps_MSD %>% 
@@ -1234,21 +1240,20 @@ Chirps_o <- Chirps_MSD %>%
   rename(MSD = 'data')
 
 
-prueba_chirps <- prueba_chirps %>%
+Chirps_series <- Chirps_series %>%
   dplyr::select(-data) %>% 
   # filter(id == 1, year == 1982) %>%
   inner_join(Chirps_o, .)
 
 
-
-
-prueba_chirps <- prueba_chirps %>% 
+Chirps_series <- Chirps_series %>% 
   # filter(id == 1)  %>% 
   mutate(id = station_N) %>% 
   dplyr::select(id, MSD, data_curve) %>% 
   nest(-id )
 
 
+# This make the gif for each time serie. 
 # Don't run this.
 by_id_o <- function(MSD_Local, id_pixel){
   # MSD_Local <- prueba_o %>%  filter(id == 2) %>% dplyr::select(data) %>% unnest
@@ -1264,20 +1269,17 @@ by_id_o <- function(MSD_Local, id_pixel){
   
   animation <- magick::image_animate(img, fps = 0.5)
   # print(animation)
-  image_write(animation, glue::glue("Drought/Station_R/Chirps_results/original/id_{id_pixel}.gif"))
+  image_write(animation, glue::glue("D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/Chirps/id_{id_pixel}.gif"))
 }
 
-
-tictoc::tic()
-test1_chirps <-  prueba_chirps %>%
-  # filter(row_number() > 2) %>% 
-  mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id_o))
-tictoc::toc() # Aun no tenenmos estimado de tiempo total por id. 
-
+# tictoc::tic()
+# test1_chirps <-  prueba_chirps %>%
+#   # filter(row_number() > 2) %>% 
+#   mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id_o))
+# tictoc::toc() # We have not yet estimated the total time per id. 
 
 
-
-#################################
+########### Desde aqui revisar mañana...
 # Individual graphs...
 
 # Data_index <- prueba_chirps %>% unnest %>% filter(row_number() == 1) %>% dplyr::select(MSD) %>% unnest
@@ -1321,368 +1323,6 @@ tictoc::toc()
 
 
 
-# Chirps_MSD1 <-  Chirps_MSD
-
-
-
-
-
-
-
-
-# Here we will do step 3. 
-# This function find the canicula when the general local maximo is canicula's start.
-canicula_after <- function(local_max, mins, maxs){
-  # local_max <- GL_max; mins <- min; maxs <- max
-  
-  # Step 3. Find the minimum ... possible.
-  
-  # This computes all possible local min after general local max. 
-  min_after <- mins %>% 
-    filter(julian > local_max$julian)
-  
-  # This line join max with mins in one tibble. 
-  base_filter_Ind <- bind_rows(min_after, maxs) %>%
-    dplyr::select(-testing) %>%
-    arrange(julian) %>% # Here i change this. 
-    mutate(dif = julian - local_max$julian) %>% 
-    filter(dif > 5) %>% 
-    dplyr::select(-dif) %>%
-    bind_rows(local_max, .)
-  
-  # This line calculate the number of rows... that the dataset has.
-  nrow_base <- nrow(min_after)
-  
-  # making the arrangement or trap to add mutates.
-  min_after <- base_filter_Ind %>%
-    filter(row_number() > 1) 
-  
-
-  
-  # add mutates.
-  j <- 1 
-  for(i in 1:nrow_base){
-    # print(i) ; print(j)
-    
-    # cat(glue::glue('(i = {i} ; j = {j}) '))
-    varname <- glue::glue('sub{j}L')
-    varname1 <- glue::glue('jul{j}L')
-    
-    min_after <- min_after %>% 
-      mutate(!!varname := mov_ts - lead(mov_ts, n = j), 
-             !!varname1 := lead(julian, n = j) - julian) 
-    
-    j <-  (2*i) + 1 }
-  
-  # Here we extract the second local max. 
-  
-  jul_sub <- min_after %>%
-    filter(type == 1)  %>% 
-    select(julian, month, mov_ts, type, contains('jul'))  %>% 
-    gather(type, jul_sub, -julian, -month, -mov_ts, -type) %>% 
-    mutate(type = str_replace(type, 'jul', 'sub'))
-  
-  min_after <- min_after %>%
-    filter(type == 1)  %>% 
-    select(julian, month, mov_ts, type, contains('sub')) %>% 
-    gather(type, value, -julian, -month, -mov_ts, -type) %>% 
-    right_join(. , jul_sub) %>% 
-    filter(jul_sub > 5) %>% 
-    arrange(value)  %>% 
-    filter(value < 0) %>% # Here i change this line. 
-    slice(1) %>% 
-    dplyr::select(-contains('jul_'))
-  
-  
-  # If we find min... do second max and canicula. 
-  # In other case only create canicula with data NA.
-  if(nrow(min_after) != 0){
-    # Ok this line select the second max.     
-    second_max <- maxs %>% 
-      filter(julian > min_after$julian) %>% 
-      mutate(num = paste0( 'sub', seq(1, (2*(nrow(.)-1) + 1), by = 2), 'L')) %>% 
-      filter(num == min_after$type)
-    
-    # (2*(1-1) + 1) ; (2*(2-1) + 1) ; (2*(3-1) + 1) ; (2*(4-1) + 1)
-    # Here we create the final object...
-    canicula_after <- tibble(start_date = local_max$julian, min_date = min_after$julian, 
-                             end_date = second_max$julian, length = end_date - start_date)
-  }else{
-    canicula_after <- tibble(start_date = NA, min_date = NA, end_date = NA, length = NA)
-  }
-  
-  return(canicula_after)}
-
-# Step 4. Here we will do step 4. The idea it's run before_canicula function.  
-canicula_before <- function(local_max, mins, maxs){
-  # local_max <- GL_max; mins <- min; maxs <- max
-  
-  
-  # Step 4. Find the minimum ... possible. 
-  min_before <- mins %>% 
-    filter(julian < local_max$julian)
-  
-  # This line join max with mins in one tibble.  
-  min_b <- bind_rows(min_before, maxs) %>%
-    dplyr::select(-testing) %>%
-    arrange(julian) %>% # Here i change this. 
-    mutate(dif = local_max$julian - julian)  %>% 
-    filter(dif > 5)  %>% 
-    dplyr::select(-dif) %>%
-    bind_rows(., local_max)
-  
-  
-  # This line calculate the number of rows... that the dataset has.
-  nrow_base <- nrow(min_before)
-  
-  # making the arrangement or trap to add mutates.
-  # =-=-=-=-=-=
-  j <- 1 
-  for(i in 1:nrow_base){
-    # print(i) ; print(j)
-    
-    # cat(glue::glue('(i = {i} ; j = {j}) '))
-    varname <- glue::glue('sub{j}L')
-    varname1 <- glue::glue('jul{j}L')
-    
-    min_b <- min_b %>% 
-      mutate(!!varname := mov_ts - lag(mov_ts, n = j), 
-             !!varname1 := julian - lag(julian, n = j)) 
-    
-    j <-  (2*i) + 1 }
-  
-  
-  jul_sub <- min_b %>%
-    filter(type == 1)  %>% 
-    select(julian, month, mov_ts, type, contains('jul'))  %>% 
-    gather(type, jul_sub, -julian, -month, -mov_ts, -type) %>% 
-    mutate(type = str_replace(type, 'jul', 'sub'))
-  
-  min_b <- min_b %>% 
-    filter(type == 1)  %>% 
-    select(julian, month, mov_ts, type, contains('sub')) %>% 
-    gather(type, value, -julian, -month, -mov_ts, -type) %>% 
-    right_join(. , jul_sub) %>% 
-    filter(jul_sub > 5) %>% 
-    arrange(value)  %>% 
-    filter(value < 0) %>% # Here i change this line. 
-    slice(1) %>% 
-    dplyr::select(-contains('jul_'))
-  
-  
-  # If we find min... do first max and canicula. 
-  # In other case only create canicula with data NA.
-  if(nrow(min_b) != 0){
-    
-    
-    # seq(1, (2*(nrow(.)-1) + 1), by = 2)
-    
-    ini_max <- maxs %>% 
-      filter(julian < min_b$julian) %>% 
-      # mutate(num = paste0( 'sub',rev(1:nrow(.)), 'L')) %>%
-      mutate(num = paste0( 'sub', rev(seq(1, (2*(nrow(.)-1) + 1), by = 2)), 'L')) %>%
-      filter(num == min_b$type)
-    
-    # Here we create the final object...
-    canicula_before <- tibble(start_date = ini_max$julian, min_date = min_b$julian, 
-                              end_date = local_max$julian, length = end_date - start_date)
-  }else{
-    canicula_before <- tibble(start_date = NA, min_date = NA, end_date = NA, length = NA)
-  }
-  
-  return(canicula_before)}
-
-# data <- chirps_p %>% 
-#   filter(id == 2 ) %>% 
-#   unnest() %>% 
-#   nest(-station_N, -Lon, -Lat, -year)  %>% 
-#   mutate(data = purrr::map(.x = data, .f = filter_data)) %>% 
-#   filter(year == 1991) %>% 
-#   dplyr::select(data) %>% 
-#   unnest()
-
-
-define_two_MSD <- function(data){
-  # data <- jmm
-  # First step: define general local maximum and 
-  # filter minimums that do not have a maximum next or before.
-  
-  #Note: I think it's important compute time series maximum and include if that is possible.
-  
-  # Compute 
-  max <- filter(data, type == 2)
-  
-  # For Now we don't use this information on next step. 
-  # max_G <- filter(data, row_number() == which.max(data$mov_ts))
-  
-  # This line filter minimums local 
-  # when doesn't have local max before or next.  
-  min <- filter(data, type == 1) %>%
-    mutate(testing = case_when(
-      julian < max$julian[1] ~ 1,
-      julian > last(max$julian) ~ 2,
-      TRUE ~ 0)) %>%
-    filter(testing ==  0)
-  
-  #  Step 2. Compute the max of local_max.
-  GL_max <- max %>%
-    arrange(desc(mov_ts)) %>%
-    slice(1)
-  
-  if(nrow(GL_max) == 1){
-    # Step 3. Here we will do step 3. The idea it's run after_canicula function. 
-    canicula_A <- canicula_after(local_max = GL_max, mins = min, maxs = max)
-    # Step 4. Here we will do step 4. The idea it's run before_canicula function.  
-    canicula_B <- canicula_before(local_max = GL_max, mins = min, maxs = max)
-    
-    # Step_5. Here we join two MSD. 
-    MSD_two_sides <- bind_rows(canicula_A, canicula_B) %>%
-      mutate(type = c('A', 'B')) %>%
-      dplyr::select(type, start_date, min_date, end_date, length)  
-  }else{
-    MSD_two_sides <- tibble(type = 'N', start_date = NA, min_date = min$julian, end_date = NA, length = NA) %>% 
-      bind_rows(tibble(type = 'N', start_date = NA, min_date = min$julian, end_date = NA, length = NA), .)
-  }
-  
-  
-  return(MSD_two_sides)}
-
-
-# here we subtract the maximum - minimum of the MSD and then we averaged the differences.
-dif_mean <- function(f){
-  a <- filter(f, dates == 'start_date')$mov_ts
-  b <- filter(f, dates == 'min_date')$mov_ts
-  c <- filter(f, dates == 'end_date')$mov_ts
-  
-  # mean_dif <- ((a-b) + (c-b) + abs(a-c))/3
-  median_dif <- median(c((a-b), (c-b), abs(a-c)))
-  # return(mean_dif)
-  return(median_dif)}
-
-# This function identify MSD between MSD before and after. 
-One_MSD <- function(MSD1, data){
-  
-  # MSD1 <- MSD_two_sides
-  
-  # r <- 6
-  # data <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%
-  # filter(row_number() == r) %>% dplyr::select(data) %>% unnest()
-  # MSD1 <- MSD_proof  %>% filter(year_to %in% c(1988,1992,1993,2002,2007,2008)) %>%
-  #   filter(row_number() == r) %>% dplyr::select(Two_MSD) %>% unnest()
-  
-  # data1 %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + 
-  #   theme_bw()+ geom_vline(xintercept = as.numeric(MSD1[1, 2:4]), col = 'red') + 
-  #   geom_vline(xintercept = as.numeric(MSD1[2, 2:4]), col = 'blue') 
-  
-  MSD <-  MSD1 %>%
-    dplyr::select(-length) %>% 
-    gather(dates, julian, -type) %>% 
-    mutate(mov_ts = purrr::map(.x = julian, .f = function(.x){data %>% filter(julian == .x) %>% .$mov_ts}) ) %>% 
-    unnest(mov_ts)  %>% 
-    nest(-type) %>% 
-    mutate(dif = purrr::map(.x = data, .f = dif_mean)) %>% 
-    unnest(dif) %>% 
-    # arrange(desc(dif)) %>% 
-    arrange(dif) 
-  
-  MSD_F <- MSD %>% 
-    filter(dif > 1) %>%
-    filter(row_number() == 1)
-  
-  MSD <- if(nrow(MSD_F) < 1){filter(MSD, row_number() == 1)}else{MSD_F}
-
-  return(MSD)}
-
-
-# This function organize the MSD, if we don't identify MSD put type = N, 
-# in the case we own two MSD the function selects one. 
-MSD_correction <- function(MSD_C){
-  
-  # Identify which it's MSD when we have two (what are the cases?)
-  MSD_C1 <- MSD_C %>% 
-    mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>% 
-    unnest(proof) %>% 
-    filter(proof == 2) %>% 
-    mutate(Two_MSD = purrr::map2(.x = Two_MSD, .y = data,.f = One_MSD)) %>% 
-    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>% 
-    unnest %>% 
-    dplyr::select(station_N, Lon, Lat,  year, type)
-  
-  
-  # Extract the MSD selected. 
-  MSD_C1 <- MSD_C %>% 
-    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>%
-    unnest %>% 
-    nest(-station_N, -Lon, -Lat,  -year, -type) %>% 
-    inner_join(MSD_C1, .) %>% 
-    unnest
-  
-  
-  # Change type when we don't identify MSD. 
-  No_MSD <- MSD_C %>%
-    mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>%
-    unnest(proof)  %>%
-    filter(proof == 0) %>% 
-    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>% 
-    unnest %>% 
-    mutate(type = 'N') %>% 
-    unique()
-  
-  # Join all MSD. 
-  MSD <- MSD_C %>%
-    mutate(proof = purrr::map(.x = Two_MSD, .f = function(.x){.x %>% na.omit() %>% nrow()})) %>%
-    unnest(proof)  %>%
-    filter(proof == 1) %>% 
-    dplyr::select(station_N, Lon, Lat,  year, Two_MSD) %>%
-    unnest %>% 
-    na.omit() %>% 
-    bind_rows(MSD_C1, No_MSD, .) %>% 
-    arrange(year)
-  
-  return(MSD)}
-
-
-
-##############################################################################
-filter_data <- function(dr){
-  
-  # Testing other methodologies...
-  year_pixel <-  dr %>% 
-    dplyr::select(day, month , julian, mov) %>% 
-    filter(month %in% 5:8) %>% 
-    dplyr::select(julian, month, mov) %>% 
-    rename(mov_ts = 'mov') %>% 
-    mutate(type = case_when(
-      lag(mov_ts) - mov_ts > 0  & lead(mov_ts) - mov_ts > 0  ~ 1, 
-      lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
-      TRUE ~ 0  ) )  
-  
-  return(year_pixel)}
-
-run_for_each_OS <- function(dr){
-  
-  MSD_proof <- dr %>% 
-    nest(-station_N, -Lon, -Lat, -year) %>% 
-    mutate(data = purrr::map(.x = data, .f = filter_data), 
-           Two_MSD = purrr::map(.x = data, .f = define_two_MSD))
-  
-  
-  MSD_proof <- MSD_correction(MSD_proof)
-  return(MSD_proof)}
-
-data_Oy <- function(data){
-  
-  data_base <- data %>%
-    filter(month %in% 5:8) %>%
-    rename(mov_ts = mov) %>% 
-    dplyr::select(julian, month, mov_ts) %>% 
-    mutate(type = case_when(
-      lag(mov_ts) - mov_ts > 0  & lead(mov_ts) - mov_ts > 0  ~ 1, 
-      lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
-      TRUE ~ 0  ) ) 
-  return(data_base)}
-
-
 
 
 
@@ -1693,8 +1333,8 @@ data_Oy <- function(data){
 # Do CPT file.
 # =-=-=-=-=-=-=-=-=-=-=-=-=-= 
  CPT_file <- function(data, var){
-  # data <- MSD_data
-  # var <- 'Intensity'
+  # data <- Chirps_MSD
+  # var <- 'length'
    
     CPT_data <- data %>% 
      dplyr::select(-id, -data) %>% 
@@ -1743,83 +1383,6 @@ data_Oy <- function(data){
 #  Var <- c(Length, Intensity, Magnitude)
 
 CPT_file(data = MSD_data, var = 'Length')
-# CPT_file(data = MSD_data, var = 'Intensity')
-# CPT_file(data = MSD_data, var = 'Magnitude')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=
-# Do CPT file.
-# =-=-=-=-=-=-=-=-=-=-=-=-=-= 
-# CPT_file <- function(data, var){
-#  # data <- MSD_data
-#  # var <- 'Intensity'
-#   
-#    CPT_data <- data %>% 
-#     dplyr::select(-id, -data) %>% 
-#     unnest %>% 
-#     dplyr::select(year, id, !!var) %>% 
-#     spread(key = id, value = !!var) 
-#    
-#   Lat_Long  <- data %>% 
-#     dplyr::select(-id, -data) %>% 
-#     unnest %>% 
-#     dplyr::select(x, y) %>% 
-#     unique %>% 
-#     t() 
-# 
-#   colnames(Lat_Long) <- paste0(1:150)
-#   rownames(Lat_Long) <- NULL
-#   
-#   
-#   Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
-#   
-#   names(Lat_Long) <- c('', paste0('V',1:150))
-#   names(CPT_data) <- c('', paste0('V',1:150))
-# 
-# 
-#   
-#   # =-=-=-=-=-=-=-=-=-=-=-=
-#   CPT_data <- CPT_data %>% 
-#     mutate_if(is.factor, as.character) %>% 
-#     mutate_if(is.character, as.numeric)  %>%
-#     rbind(Lat_Long, .) 
-#   
-# 
-#   file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Chirps_', var, '.txt')
-#   
-#   
-#   sink(file = file)
-#   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
-#   cat('cpt:nfield=1', sep = '\n')
-#   cat(glue("cpt:field=days, cpt:nrow=37, cpt:ncol=150, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
-#   cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
-#   sink()
-# 
-# }  
-
-## MSD_data %>%
-##   dplyr::select(-id, -data) %>%
-##   unnest
-##  Var <- c(Length, Intensity, Magnitude)
-
-# CPT_file(data = MSD_data, var = 'Length')
 # CPT_file(data = MSD_data, var = 'Intensity')
 # CPT_file(data = MSD_data, var = 'Magnitude')
 
