@@ -309,7 +309,7 @@ new_JointCS <-  Joint_CS %>%
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # Proof a new metogology spliting data time serie.
-
+# From here we compute the MSD for stations. 
 # .------..------..------..------..------.
 # |P.--. ||R.--. ||O.--. ||O.--. ||F.--. |
 # | :/\: || :(): || :/\: || :/\: || :(): |
@@ -317,10 +317,8 @@ new_JointCS <-  Joint_CS %>%
 # | '--'P|| '--'R|| '--'O|| '--'O|| '--'F|
 # `------'`------'`------'`------'`------'
 
-
 ##############################################################################
-station <- read_csv("Drought/dr.csv")
-
+# station <- read_csv("Drought/dr.csv")
 
 # This function (curve HoltWinters) summarise the time 
 # filter by year and compute HoltWinters - triangular mean. 
@@ -499,10 +497,6 @@ canicula_before <- function(local_max, mins, maxs){
   
   return(canicula_before)}
 
-# jmm <- curve_HoltWinters(year_to = 2010)
-
-# jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()
-
 # I guess this function should be the final function with all MSD types. 
 define_two_MSD <- function(data){
   # data <- jmm
@@ -549,7 +543,6 @@ define_two_MSD <- function(data){
   
 return(MSD_two_sides)}
 
-
 # here we subtract the maximum - minimum of the MSD and then we averaged the differences.
 dif_mean <- function(f){
   a <- filter(f, dates == 'start_date')$mov_ts
@@ -587,7 +580,6 @@ One_MSD <- function(MSD1, data){
     filter(row_number() == 1)
   
   return(MSD)}
-
 
 # This function organize the MSD, if we don't identify MSD put type = N, 
 # in the case we own two MSD the function selects one. 
@@ -673,18 +665,10 @@ run_for_each_station <- function(dr){
   return(MSD_proof)}
 
 
-# jmm %>% ggplot(aes(julian, mov_ts)) + geom_line(colour ='pink') + geom_point() + theme_bw()+
-#   geom_vline(xintercept = as.numeric(canicula_B[1,-4]), col = 'red')
-
-# jmm <- curve_HoltWinters(year_to = 2010)
-# define_two_MSD(jmm)
-
-
-
 ##################################################
-# Pruebas para correr todas las estaciones...
+# Organize the data for all stations.  ...
 
-MSD_test <- new_JointCS %>% 
+MSD_station <- new_JointCS %>% 
   dplyr::select(-NA_percent, -data_filling) %>% 
   mutate(id = 1:nrow(.)) %>% 
   unnest %>% 
@@ -692,15 +676,15 @@ MSD_test <- new_JointCS %>%
   nest(-id)
 
 
-
-# Aquí se corre la canicula por estaciones. 
-test<- MSD_test %>%  # filter(row_number() == 6) %>%
+# Here run canicula for all stations but using HoltWinters smoothing.. 
+tictoc::tic()
+MSD_station_S <- MSD_station %>%  # filter(row_number() == 6) %>%
   mutate(MSD = purrr::map(.x = data, .f = run_for_each_station)) %>% 
   dplyr::select(MSD) %>% 
   unnest 
+tictoc::toc() # 38.91 sec
 
-
-test1 <- test %>% 
+data_to_graph <- MSD_station_S %>% 
   rename(x = 'Lon', y = 'Lat') %>% 
   dplyr::select( station_N, x,  y , length) %>% 
   group_by(station_N,  x,  y) %>% 
@@ -711,7 +695,7 @@ test1 <- test %>%
     NA_p < 30 & NA_p >= 20 ~ '[20-30) %', 
     NA_p >= 30 ~ '30% +'))
 
-p <- ggplot(test1)  + 
+p <- ggplot(data_to_graph)  + 
   geom_point(aes(x = x, y =  y, colour = NA_p)) +
   scale_colour_viridis(na.value="white",  direction = -1) + 
   geom_sf(data = shp, fill = NA, color = gray(.5)) +
@@ -720,7 +704,7 @@ p <- ggplot(test1)  +
   labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
   
 
-q <- ggplot(test1)  + 
+q <- ggplot(data_to_graph)  + 
   geom_point(aes(x = x, y =  y, colour = na_cat)) +
   scale_colour_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
   geom_sf(data = shp, fill = NA, color = gray(.5)) +
@@ -729,11 +713,9 @@ q <- ggplot(test1)  +
   labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
 
 
-out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/'
-
+out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/stations/'
 gridExtra::grid.arrange(p, q, ncol = 2)
-
-write.csv(test, glue::glue('{out_folder}HW_TM_MSD.csv'))
+write.csv(MSD_station_S, glue::glue('{out_folder}HW_TM_MSD.csv'))
 
 
 # data <- MSD_test %>% filter(row_number() == 5) %>% dplyr::select(data) %>% 
@@ -743,20 +725,15 @@ write.csv(test, glue::glue('{out_folder}HW_TM_MSD.csv'))
 #   dplyr::select(station_N, length) %>%
 #   group_by(station_N) %>% 
 #   skimr::skim()
-
-
-
 # Gift por estaciones. 
 
-data <- MSD_test %>% 
+data <- MSD_station %>% 
   filter(id == 1) %>% 
   dplyr::select(data) %>% 
   unnest %>% 
   filter(year == 1982)
 
-# curve_HoltWinters(data)
-
-
+# This function 
 data_curve_by_year <- function(data){
   # Testing other methodologies...
   year_pixel <-  data %>% 
@@ -779,33 +756,35 @@ data_curve_by_year <- function(data){
 return(data_base)}
 
  
-
-prueba <- MSD_test %>% 
+### Arreglar desde aqui... 
+data_S_and_C <- MSD_station %>% 
   unnest() %>% 
   nest(-id, -station_N, -Lon, -Lat, -year) %>% 
 mutate(data_curve = purrr::map(.x = data, .f = data_curve_by_year))
 
 
-ajam <- test %>% 
+other_MSD_S <- MSD_station_S %>% 
   mutate(year_to = year) %>% 
   nest(-Lon, -Lat, -year) %>% 
   rename(MSD = 'data')
 
 
-
-prueba <- prueba %>%
+data_S_and_C <- data_S_and_C %>%
   dplyr::select(-data) %>% 
   # filter(id == 1, year == 1982) %>%
-  inner_join(ajam, .)
+  inner_join(other_MSD_S, .)
 
-# Aqui se genera la forma del grafico...
+
+###############
+# This function is making gifs for each stations. 
+
+# Here the form of the graphic is generated ...
  Individual_graph <- function(Data_index, Data){
    # Data_index<- MSD_Local$MSD[[1]]
    # Data <- MSD_Local$data_curve[[1]]
-
+   
    # Data_index <- Data_index %>%
    #   na_if(-999)
-
    graph <-  ggplot(Data) +
      geom_point(aes(julian, mov_ts, colour = as.factor(type))) + 
      geom_line(aes(julian, mov_ts)) +
@@ -822,7 +801,7 @@ prueba <- prueba %>%
    print(graph)
  }
 
- # Aqui se genera el gift...
+ # Here the gif is generated ...
  by_id <- function(MSD_Local, id_pixel){
    # MSD_Local <- prueba %>%  filter(id == 2) %>% dplyr::select(data) %>% unnest
    
@@ -837,42 +816,30 @@ prueba <- prueba %>%
 
     animation <- magick::image_animate(img, fps = 0.5)
     # print(animation)
-    image_write(animation, glue::glue("Drought/Station_R/station/id_{id_pixel}.gif"))
+    image_write(animation, glue::glue("D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/stations/gif/id_{id_pixel}.gif"))
  }
+
+ ###############
+  
  
- ## Listo probando. 
- prueba <- prueba %>% 
+ data_S_and_C <- data_S_and_C %>% 
    # filter(id == 1)  %>% 
    dplyr::select(id, MSD, data_curve) %>% 
    nest(-id )
- 
-tictoc::tic()
- test1 <-  prueba %>%
-   # filter(row_number() == 1) %>% 
-   mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id))
-tictoc::toc() # 1.37 h
+# Not run  
+# tictoc::tic()
+#  graphs_gif_s <-  data_S_and_C %>%
+#    # filter(row_number() == 1) %>% 
+#    mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id))
+# tictoc::toc() # 1.37 h
  # by_id(MSD_Local = test1$data[[1]], id_pixel = test1$id)
  
- 
- 
- 
- 
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-# Proof a new metogology spliting data time serie  ---- using 
-
-# .------..------..------..------..------.
-# |P.--. ||R.--. ||O.--. ||O.--. ||F.--. |
-# | :/\: || :(): || :/\: || :/\: || :(): |
-# | (__) || ()() || :\/: || :\/: || ()() |
-# | '--'P|| '--'R|| '--'O|| '--'O|| '--'F|
-# `------'`------'`------'`------'`------'
-
 
 ##############################################################################
-# Test with acum data...
+# This compare original data and data with smoothing.
 
-
+station <- read_csv("Drought/dr.csv")
+ 
 for(i in 1982:2017){
   up <- station %>%  filter(year == i)  %>% 
     mutate(roll_acum = zoo::rollsum(x = prec_C, 31, align = "right", fill = NA))
@@ -899,13 +866,8 @@ for(i in 1982:2017){
     labs(title = 'Triangular averange: red (non-transformation) - black (HoltWinters)', x = 'Julian day')
   
   c <- gridExtra::grid.arrange(a, b, ncol = 2)
-  ggsave(c, filename = glue::glue('Drought/Station_R/acum_mov/y{i}.png'), width = 32, height = 16, units = "cm")
+  ggsave(c, filename = glue::glue('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/compare_curves/y{i}.png'), width = 32, height = 16, units = "cm")
 }
-
-
-
-
-
 
 
 
@@ -913,22 +875,18 @@ for(i in 1982:2017){
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # Proof a new metogology spliting data time serie  ---- using 
 
-# .------..------..------..------..------.
-# |P.--. ||R.--. ||O.--. ||O.--. ||F.--. |
-# | :/\: || :(): || :/\: || :/\: || :(): |
-# | (__) || ()() || :\/: || :\/: || ()() |
-# | '--'P|| '--'R|| '--'O|| '--'O|| '--'F|
-# `------'`------'`------'`------'`------'
-
-
-##############################################################################
-# Test with orginal data triangular mean.
-
-
+#   ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^    ^  
+#  /O\  /r\  /i\  /n\  /g\  /i\  /n\  /a\  /l\  /D\  /_\  /M\  /S\  /D\ 
+# <___><___><___><___><___><___><___><___><___><___><___><___><___><___>
+   
 # dr <- station
 
+# Station 
+ 
 # This function (curve HoltWinters) summarise the time 
 # filter by year and compute HoltWinters - triangular mean. 
+ 
+#### Modified functions to run stations, with original data.
 filter_data <- function(dr){
   
   # Testing other methodologies...
@@ -943,7 +901,6 @@ filter_data <- function(dr){
       TRUE ~ 0  ) )  
   
   return(year_pixel)}
-
 
 run_for_each_OS <- function(dr){
   
@@ -979,11 +936,7 @@ run_for_each_OS <- function(dr){
   
   MSD_proof <- MSD_correction(MSD_proof)
   return(MSD_proof)}
-
-
-
-
-
+####################################
 
 MSD_tO <- new_JointCS %>% 
   dplyr::select(-NA_percent, -data_filling) %>% 
@@ -992,16 +945,13 @@ MSD_tO <- new_JointCS %>%
   dplyr::select(-prec_R, -mov_R) %>% 
   nest(-id)
 
-
-
-# Aquí se corre la canicula por estaciones. 
-test_o <- MSD_tO %>%  # filter(row_number() == 6) %>%
+# Here the canicula runs by stations.. 
+MSD_SO <- MSD_tO %>%  # filter(row_number() == 6) %>%
   mutate(MSD = purrr::map(.x = data, .f = run_for_each_OS)) %>%
   dplyr::select(MSD) %>%
   unnest
 
-
-test1_O <- test_o %>%
+MSD_SO1 <- MSD_SO %>%
   rename(x = 'Lon', y = 'Lat') %>%
   dplyr::select( station_N, x,  y , length) %>%
   group_by(station_N,  x,  y) %>%
@@ -1013,8 +963,7 @@ test1_O <- test_o %>%
     NA_p < 30 & NA_p >= 20 ~ '[20-30) %',
     NA_p >= 30 ~ '30% +'))
 
-
-p <- ggplot(test1_O)  + 
+p <- ggplot(MSD_SO1)  + 
   geom_point(aes(x = x, y =  y, colour = NA_p)) +
   scale_colour_viridis(na.value="white",  direction = -1) + 
   geom_sf(data = shp, fill = NA, color = gray(.5)) +
@@ -1022,8 +971,7 @@ p <- ggplot(test1_O)  +
   theme_bw() + 
   labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
 
-
-q <- ggplot(test1_O)  + 
+q <- ggplot(MSD_SO1)  + 
   geom_point(aes(x = x, y =  y, colour = na_cat)) +
   scale_colour_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
   geom_sf(data = shp, fill = NA, color = gray(.5)) +
@@ -1032,16 +980,13 @@ q <- ggplot(test1_O)  +
   labs(x = 'Longitud', y = 'Latitud', colour = '% NA')
 
 
-out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Drought/Station_R/original_data/'
-
+out_folder <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/stations/'
 gridExtra::grid.arrange(p, q, ncol = 2)
-
-write.csv(test_o, glue::glue('{out_folder}O_TM_MSD_Median.csv'))
-
+write.csv(MSD_SO1, glue::glue('{out_folder}O_TM_MSD_Median.csv'))
 
 
-# =-=-=-=-=-=-=
 
+# =-=- Fcuntion to extract time data by stations. 
 data_Oy <- function(data){
 
   data_base <- data %>%
@@ -1053,26 +998,25 @@ data_Oy <- function(data){
       lead(mov_ts) - mov_ts < 0 & lag(mov_ts) - mov_ts < 0  ~ 2,
       TRUE ~ 0  ) ) 
   return(data_base)}
+# =-=- 
 
-# MSD_tO
-
-prueba_o <- MSD_tO %>% 
+MSD_oS <- MSD_tO %>% 
   unnest() %>% 
   nest(-id, -station_N, -Lon, -Lat, -year) %>% 
   mutate(data_curve = purrr::map(.x = data, .f = data_Oy))
 
 
-ajam_o <- test_o %>% 
+MSD_Fo <- MSD_SO %>% 
   mutate(year_to = year) %>% 
   nest(-Lon, -Lat, -year) %>% 
   rename(MSD = 'data')
 
 
 
-prueba_o <- prueba_o %>%
+MSD_oS <- MSD_oS %>%
   dplyr::select(-data) %>% 
   # filter(id == 1, year == 1982) %>%
-  inner_join(ajam_o, .)
+  inner_join(MSD_Fo, .)
 
 
 # Data_index<- MSD_Local$MSD[[1]]
@@ -1080,13 +1024,13 @@ prueba_o <- prueba_o %>%
 
 
 ## Listo probando. 
-prueba_o <- prueba_o %>% 
+MSD_oS <- MSD_oS %>% 
   # filter(id == 1)  %>% 
   dplyr::select(id, MSD, data_curve) %>% 
   nest(-id )
 
 
-
+####  Functions to graph a gif by stations. 
 # Aqui se genera la forma del grafico...
 Individual_graph_o <- function(Data_index, Data){
   # Data_index<- MSD_Local$MSD[[1]]
@@ -1126,73 +1070,74 @@ by_id_o <- function(MSD_Local, id_pixel){
   
   animation <- magick::image_animate(img, fps = 0.5)
   # print(animation)
-  image_write(animation, glue::glue("Drought/Station_R/original_data/id_{id_pixel}.gif"))
+  image_write(animation, glue::glue("D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/stations/id_{id_pixel}.gif"))
 }
 
-
-
-
-
-
-
+# Not run... this 
 tictoc::tic()
-test1_o <-  prueba_o %>%
-  filter(row_number() > 2) %>% 
+test1_o <-  MSD_oS %>%
+  filter(row_number() == 1) %>% 
   mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id_o))
 tictoc::toc() # 1.37 h
 # by_id(MSD_Local = test1$data[[1]], id_pixel = test1$id)
 
 
 
+#### Save CPT files by stations. 
 
+# This are tje functions to make the final file. 
+CPT_file_s <- function(data, var){
 
+  # data <-  MSD_SO
+  # var <- 'start_date'
+  
+  CPT_data <- data %>%
+    # dplyr::select(-type) %>%
+    # unnest %>%
+    rename(id = 'station_N') %>%
+    dplyr::select(year, id, !!var) %>%
+    mutate_if(is.numeric, list(~round(., 1))) %>%
+    replace(is.na(.), -999) %>% 
+    spread(key = id, value = !!var) 
 
+  Lat_Long  <- data %>%
+    # dplyr::select(-id, -data) %>%
+    # unnest %>%
+    rename(x = Lon, y = Lat) %>% 
+    dplyr::select(x, y) %>%
+    unique %>%
+    t()
 
-# CPT_file_s <- function(data, var){
-#   data <- proof
-#   var <- 'Intensity'
-#   
-#   CPT_data <- data %>% 
-#     dplyr::select(-id, -data) %>% 
-#     unnest %>% 
-#     dplyr::select(year, id, !!var) %>% 
-#     mutate_if(is.numeric, list(~round(., 1))) %>%
-#     spread(key = id, value = !!var)  
-#   
-#   Lat_Long  <- data %>% 
-#     dplyr::select(-id, -data) %>% 
-#     unnest %>% 
-#     dplyr::select(x, y) %>% 
-#     unique %>% 
-#     t() 
-#   
-#   colnames(Lat_Long) <- paste0(1:10)
-#   rownames(Lat_Long) <- NULL
-#   
-#   Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)  
-#   
-#   names(Lat_Long) <- c('', paste0('V',1:10))
-#   names(CPT_data) <- c('', paste0('V',1:10))
-#   
-#   # =-=-=-=-=-=-=-=-=-=-=-=
-#   CPT_data <- CPT_data %>% 
-#     mutate_if(is.factor, as.character) %>% 
-#     mutate_if(is.character, as.numeric)  %>%
-#     rbind(Lat_Long, .) 
-#   
-#   file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Station_', var, '.txt')
-#   
-#   sink(file = file)
-#   cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
-#   cat('cpt:nfield=1', sep = '\n')
-#   cat(glue("cpt:field=days, cpt:nrow=36, cpt:ncol=10, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
-#   cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
-#   sink()
-# }  
+  colnames(Lat_Long) <- paste0(1:10)
+  rownames(Lat_Long) <- NULL
 
-# proof
-# Intensity - Length - Magnitude
-# CPT_file_s(data = proof, var = 'Intensity' )
+  Lat_Long <- add_column(as_tibble(Lat_Long), year = c('cpt:X', 'cpt:Y'), .before = 1)
+
+  names(Lat_Long) <- c('', paste0('V',1:10))
+  names(CPT_data) <- c('', paste0('V',1:10))
+
+  # =-=-=-=-=-=-=-=-=-=-=-=
+  CPT_data <- CPT_data %>%
+    mutate_if(is.factor, as.character) %>%
+    mutate_if(is.character, as.numeric)  %>%
+    rbind(Lat_Long, .)
+
+  file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/stations/', var, '.txt')
+
+  sink(file = file)
+  cat('xmlns:cpt=http://iri.columbia.edu/CPT/v10/', sep = '\n')
+  cat('cpt:nfield=1', sep = '\n')
+  cat(glue("cpt:field=days, cpt:nrow=36, cpt:ncol=10, cpt:col=station, cpt:row=T, cpt:units=julian;cpt:missing=-999"), sep = '\n')
+  cat(write.table(CPT_data, sep = '\t', col.names = TRUE, row.names = FALSE, na = "", quote = FALSE))
+  sink()
+}
+
+# MSD_SO
+# start_date min_date end_date length
+CPT_file_s(data =  MSD_SO, var = 'start_date')
+CPT_file_s(data =  MSD_SO, var = 'min_date')
+CPT_file_s(data =  MSD_SO, var = 'end_date')
+CPT_file_s(data =  MSD_SO, var = 'length')
 
 
 
