@@ -797,9 +797,11 @@ data_S_and_C <- data_S_and_C %>%
    
    # Data_index <- Data_index %>%
    #   na_if(-999)
+   x <- Data %>% slice(1, 30) %>% .$julian
    graph <-  ggplot(Data) +
      geom_point(aes(julian, mov_ts, colour = as.factor(type))) + 
      geom_line(aes(julian, mov_ts)) +
+     annotate("rect", xmin=x[1], xmax=x[2], ymin=-Inf, ymax=Inf, alpha = .1)  +
      theme_bw() +
      labs(x = 'Julian day', y = "HoltWinters - Triangular Average (mm)", colour = '') +
      geom_vline( xintercept = c(Data_index$start_date, Data_index$end_date), 
@@ -841,7 +843,7 @@ data_S_and_C <- data_S_and_C %>%
 # Not run  
 # tictoc::tic()
 #  graphs_gif_s <-  data_S_and_C %>%
-#    # filter(row_number() == 1) %>% 
+#    filter(row_number() == 1) %>%
 #    mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id))
 # tictoc::toc() # 1.37 h
  # by_id(MSD_Local = test1$data[[1]], id_pixel = test1$id)
@@ -1050,10 +1052,12 @@ Individual_graph_o <- function(Data_index, Data){
   
   # Data_index <- Data_index %>%
   #   na_if(-999)
+  x <- Data %>% slice(1, 30) %>% .$julian
   
   graph <-  ggplot(Data) +
     geom_point(aes(julian, mov_ts, colour = as.factor(type))) + 
     geom_line(aes(julian, mov_ts)) +
+    annotate("rect", xmin=x[1], xmax=x[2], ymin=-Inf, ymax=Inf, alpha = .1)  +
     theme_bw() +
     labs(x = 'Julian day', y = "Triangular Average (mm)", colour = '') +
     geom_vline( xintercept = c(Data_index$start_date, Data_index$end_date), 
@@ -1150,6 +1154,40 @@ CPT_file_s(data =  MSD_SO, var = 'start_date')
 CPT_file_s(data =  MSD_SO, var = 'min_date')
 CPT_file_s(data =  MSD_SO, var = 'end_date')
 CPT_file_s(data =  MSD_SO, var = 'length')
+
+# Save all graphs 
+
+
+Igraph_save_S <- function(Data_index, Data){
+  x <- Data %>% slice(1, 30) %>% .$julian
+  
+  p <- ggplot(Data) +
+    geom_point(aes(julian, mov_ts, colour = as.factor(type))) + 
+    geom_line(aes(julian, mov_ts)) +
+    annotate("rect", xmin=x[1], xmax=x[2], ymin=-Inf, ymax=Inf, alpha = .1)  +
+    labs(x = 'Julian day', y = "Triangular Average (mm)", colour = '') +
+    geom_vline( xintercept = c(Data_index$start_date, Data_index$end_date), 
+                linetype=4, colour = 'blue') +
+    geom_vline(xintercept = Data_index$min_date,  linetype=4, colour = 'turquoise2') +
+    labs(title = glue::glue('Id {Data_index$station_N} --- year {Data_index$year_to}')) +
+    scale_colour_manual(values = c('gray', 'blue', 'red'), 
+                        breaks = c("0", "1", "2"), 
+                        labels = c('Normal', 'Local_Min', 'Local_Max')) +
+    theme_bw() 
+  
+
+  ggsave(glue::glue("D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/stations/png_o/id_{Data_index$station_N}_{Data_index$year_to}.png"), 
+         width = 8, height = 4)
+  
+}
+
+
+tictoc::tic()
+MSD_oS %>% 
+  # filter(id < 11) %>% 
+  unnest %>% 
+  mutate(graphs = purrr::map2(.x = MSD, .y = data_curve, .f = Igraph_save_S))
+tictoc::toc()
 
 
 
@@ -1273,7 +1311,7 @@ by_id_o <- function(MSD_Local, id_pixel){
 }
 
 # tictoc::tic()
-# test1_chirps <-  prueba_chirps %>%
+# test1_chirps <-  Chirps_series %>%
 #   # filter(row_number() > 2) %>% 
 #   mutate(ajam = purrr::map2(.x = data, .y = id, .f = by_id_o))
 # tictoc::toc() # We have not yet estimated the total time per id. 
@@ -1303,29 +1341,18 @@ Igraph_save <- function(Data_index, Data){
     theme_bw() 
   
   
-  ggsave(glue::glue("Drought/Station_R/Chirps_results/original/png_dif_1/id_{Data_index$station_N}_{Data_index$year_to}.png"), 
+  ggsave(glue::glue("D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/Chirps/png/id_{Data_index$station_N}_{Data_index$year_to}.png"), 
          width = 8, height = 4)
   
 }
 
 
 tictoc::tic()
-prueba_chirps %>% 
-  filter(id < 11) %>% 
+Chirps_series %>% 
+  # filter(id < 11) %>% 
   unnest %>% 
   mutate(graphs = purrr::map2(.x = MSD, .y = data_curve, .f = Igraph_save))
-tictoc::toc()
-
-
-
-
-
-
-
-
-
-
-
+tictoc::toc() # 1.54 hor. 
 
 
 
@@ -1336,18 +1363,22 @@ tictoc::toc()
   # data <- Chirps_MSD
   # var <- 'length'
    
-    CPT_data <- data %>% 
-     dplyr::select(-id, -data) %>% 
-     unnest %>% 
-     dplyr::select(year, id, !!var) %>% 
-     spread(key = id, value = !!var) 
+    CPT_data <- data %>%
+      # dplyr::select(-type) %>%
+      # unnest %>%
+      rename(id = 'station_N') %>%
+      dplyr::select(year, id, !!var) %>%
+      mutate_if(is.numeric, list(~round(., 1))) %>%
+      replace(is.na(.), -999) %>% 
+      spread(key = id, value = !!var)
     
-   Lat_Long  <- data %>% 
-     dplyr::select(-id, -data) %>% 
-     unnest %>% 
-     dplyr::select(x, y) %>% 
-     unique %>% 
-     t() 
+   Lat_Long  <- data %>%
+     # dplyr::select(-id, -data) %>%
+     # unnest %>%
+     rename(x = Lon, y = Lat) %>% 
+     dplyr::select(x, y) %>%
+     unique %>%
+     t()
  
    colnames(Lat_Long) <- paste0(1:150)
    rownames(Lat_Long) <- NULL
@@ -1365,7 +1396,7 @@ tictoc::toc()
      rbind(Lat_Long, .) 
    
  
-   file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/CPT_files/Chirps_', var, '.txt')
+   file <- paste0('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/Chirps/Chirps_', var, '.txt')
    
    
    sink(file = file)
@@ -1382,9 +1413,9 @@ tictoc::toc()
 #   unnest
 #  Var <- c(Length, Intensity, Magnitude)
 
-CPT_file(data = MSD_data, var = 'Length')
-# CPT_file(data = MSD_data, var = 'Intensity')
-# CPT_file(data = MSD_data, var = 'Magnitude')
-
+ CPT_file(data =  Chirps_MSD, var = 'start_date')
+ CPT_file(data =  Chirps_MSD, var = 'min_date')
+ CPT_file(data =  Chirps_MSD, var = 'end_date')
+ CPT_file(data =  Chirps_MSD, var = 'length')
 
 
