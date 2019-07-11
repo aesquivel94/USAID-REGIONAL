@@ -397,13 +397,13 @@ canicula_after <- function(local_max, mins, maxs){
   
   jul_sub <- min_after %>%
     filter(type == 1)  %>% 
-    select(julian, month, mov_ts, type, contains('jul'))  %>% 
+    dplyr::select(julian, month, mov_ts, type, contains('jul'))  %>% 
     gather(type, jul_sub, -julian, -month, -mov_ts, -type) %>% 
     mutate(type = str_replace(type, 'jul', 'sub'))
   
   min_after <- min_after %>%
     filter(type == 1)  %>% 
-    select(julian, month, mov_ts, type, contains('sub')) %>% 
+    dplyr::select(julian, month, mov_ts, type, contains('sub')) %>% 
     gather(type, value, -julian, -month, -mov_ts, -type) %>% 
     right_join(. , jul_sub) %>% 
     filter(jul_sub > 5) %>% 
@@ -473,13 +473,13 @@ canicula_before <- function(local_max, mins, maxs){
   
   jul_sub <- min_b %>%
     filter(type == 1)  %>% 
-    select(julian, month, mov_ts, type, contains('jul'))  %>% 
+    dplyr::select(julian, month, mov_ts, type, contains('jul'))  %>% 
     gather(type, jul_sub, -julian, -month, -mov_ts, -type) %>% 
     mutate(type = str_replace(type, 'jul', 'sub'))
   
   min_b <- min_b %>% 
     filter(type == 1)  %>% 
-    select(julian, month, mov_ts, type, contains('sub')) %>% 
+    dplyr::select(julian, month, mov_ts, type, contains('sub')) %>% 
     gather(type, value, -julian, -month, -mov_ts, -type) %>% 
     right_join(. , jul_sub) %>% 
     filter(jul_sub > 5) %>% 
@@ -940,8 +940,6 @@ run_for_each_OS <- function(dr){
   # 
   # define_two_MSD(proof)
   
-  
-  
   MSD_proof <- dr %>% 
     nest(-station_N, -Lon, -Lat, -year) %>% 
     mutate(data = purrr::map(.x = data, .f = filter_data), 
@@ -999,8 +997,108 @@ gridExtra::grid.arrange(p, q, ncol = 2)
 write.csv(MSD_SO1, glue::glue('{out_folder}O_TM_MSD_Median.csv'))
 
 
+# Duracion promedio de la canicula 
 
-# =-=- Fcuntion to extract time data by stations. 
+mean_ps <- MSD_SO %>%
+  rename(x = 'Lon', y = 'Lat') %>%
+  dplyr::select( station_N, x,  y , length) %>%
+  group_by(station_N,  x,  y) %>%
+  summarise(mean_p = round(mean(length, na.rm = TRUE),0)) %>%
+  mutate(na_cat = case_when(
+    mean_p < 30 ~ '< 30',
+    mean_p < 50 & mean_p >= 30 ~ '[30-50) %',
+    mean_p >= 50 ~ '50 +'))
+
+
+p <- ggplot(mean_ps)  + 
+  geom_point(aes(x = x, y =  y, colour = mean_p)) +
+  scale_colour_viridis(na.value="white",  direction = -1) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', colour = 'D.P (days)' )
+
+q <- ggplot(mean_ps)  + 
+  geom_point(aes(x = x, y =  y, colour = na_cat)) +
+  scale_colour_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', colour = 'D.P (days)')
+
+gridExtra::grid.arrange(p, q, ncol = 2)
+
+
+
+
+# Guardado para cada a~no
+path_out <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/stations/maps'
+
+graph_maps <- function(year, data_graph, path_out){
+  filter_data <- data_graph %>%
+    rename(x = 'Lon', y = 'Lat') %>%
+    filter(year == year) %>%
+    mutate(length_o = case_when(
+      length < 30 ~ '< 30',
+      length < 50 & length >= 30 ~ '[30-50) %',
+      length >= 50 ~ '50 +'))
+  
+  
+  a <- ggplot(filter_data)  + 
+    geom_point(aes(x = x, y =  y, colour = length)) +
+    scale_colour_viridis(na.value="white",  direction = -1) + 
+    geom_sf(data = shp, fill = NA, color = gray(.5)) +
+    geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+    theme_bw() + 
+    labs(x = 'Longitud', y = 'Latitud', colour = 'days' )
+  
+  
+  b <-  ggplot(filter_data)  + 
+    geom_point(aes(x = x, y =  y, colour = length_o)) +
+    scale_colour_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
+    geom_sf(data = shp, fill = NA, color = gray(.5)) +
+    geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+    theme_bw() + 
+    labs(x = 'Longitud', y = 'Latitud', colour = 'days' )
+
+  ab <- gridExtra::grid.arrange(a, b, ncol = 2)
+  ggsave(glue::glue('{path_out}/length_{year}.png'), ab, 
+         width = 24, height = 6, units = "cm")
+  
+  
+  
+  c <- ggplot(filter_data)  +
+    geom_point(aes(x = x, y =  y, colour = start_date)) +
+    scale_colour_viridis(na.value="white",  direction = -1) + 
+    geom_sf(data = shp, fill = NA, color = gray(.5)) +
+    geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+    theme_bw() + 
+    labs(x = 'Longitud', y = 'Latitud', colour = 'Julian\n days', 
+         title = glue::glue('Start day ({year})'))
+  
+  d <-  ggplot(filter_data)  +
+    geom_point(aes(x = x, y =  y, colour = end_date)) +
+    scale_colour_viridis(na.value="white",  direction = -1) + 
+    geom_sf(data = shp, fill = NA, color = gray(.5)) +
+    geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+    theme_bw() + 
+    labs(x = 'Longitud', y = 'Latitud', colour = 'Julian\n days', 
+         title = glue::glue('End day ({year})'))
+  
+  cd <- gridExtra::grid.arrange(c, d, ncol = 2)
+  ggsave(glue::glue('{path_out}/dates_{year}.png'), cd, 
+         width = 24, height = 6, units = "cm")
+  
+}
+
+MSD_SO %>% 
+  nest(-year) %>% 
+  mutate(graphs = purrr::map2(.x = year, .y = data, .f = graph_maps, path_out = path_out))
+  
+
+
+
+# =-=- Function to extract time data by stations. 
 data_Oy <- function(data){
 
   data_base <- data %>%
@@ -1263,6 +1361,105 @@ write.csv(Chirps_MSD, glue::glue('{out_folder}Chirps_MSD_Median_min.csv'))
 
 # chirps_p %>% unnest() %>%
 #   write.csv(glue::glue('{out_folder}data.csv'))
+
+
+# Duracion promedio de la canicula. 
+
+mean_ps <- Chirps_MSD %>%
+  rename(x = 'Lon', y = 'Lat') %>%
+  dplyr::select( station_N, x,  y , length) %>%
+  group_by(station_N,  x,  y) %>%
+  summarise(mean_p = round(mean(length, na.rm = TRUE),0)) %>%
+  mutate(na_cat = case_when(
+    mean_p < 30 ~ '< 30',
+    mean_p < 50 & mean_p >= 30 ~ '[30-50)',
+    mean_p >= 50 ~ '50 +'))
+
+
+p <- ggplot(mean_ps)  + 
+  geom_tile(aes(x = x, y =  y, fill = mean_p)) +
+  scale_fill_viridis(na.value="white",  direction = -1) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', fill = 'D.P (days)' )
+
+q <- ggplot(mean_ps)  + 
+  geom_tile(aes(x = x, y =  y, fill = na_cat)) +
+  scale_fill_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+  theme_bw() + 
+  labs(x = 'Longitud', y = 'Latitud', fill = 'D.P (days)')
+
+gridExtra::grid.arrange(p, q, ncol = 2)
+
+
+# Guardado para cada a~no
+path_out <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/Chirps/maps/'
+
+graph_maps <- function(year, data_graph, path_out){
+  filter_data <- data_graph %>%
+    rename(x = 'Lon', y = 'Lat') %>%
+    filter(year == year) %>%
+    mutate(length_o = case_when(
+      length < 30 ~ '< 30',
+      length < 50 & length >= 30 ~ '[30-50)',
+      length >= 50 ~ '50 +'))
+  
+  
+  a <- ggplot(filter_data)  + 
+    geom_tile(aes(x = x, y =  y, fill = length)) +
+    scale_fill_viridis(na.value="white",  direction = -1) + 
+    geom_sf(data = shp, fill = NA, color = gray(.5)) +
+    geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+    theme_bw() + 
+    labs(x = 'Longitud', y = 'Latitud', fill = 'days' )
+  
+  
+  b <-  ggplot(filter_data)  + 
+    geom_tile(aes(x = x, y =  y, fill = length_o)) +
+    scale_fill_viridis(na.value="white",  direction = -1, discrete=TRUE) + 
+    geom_sf(data = shp, fill = NA, color = gray(.5)) +
+    geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+    theme_bw() + 
+    labs(x = 'Longitud', y = 'Latitud', fill = 'days' )
+  
+  ab <- gridExtra::grid.arrange(a, b, ncol = 2)
+  ggsave(glue::glue('{path_out}/length_{year}.png'), ab, 
+         width = 24, height = 6, units = "cm")
+  
+  
+  
+  c <- ggplot(filter_data)  +
+    geom_tile(aes(x = x, y =  y, fill = start_date)) +
+    scale_fill_viridis(na.value="white",  direction = -1) + 
+    geom_sf(data = shp, fill = NA, color = gray(.5)) +
+    geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+    theme_bw() + 
+    labs(x = 'Longitud', y = 'Latitud', fill = 'Julian\n days', 
+         title = glue::glue('Start day ({year})'))
+  
+  d <-  ggplot(filter_data)  +
+    geom_tile(aes(x = x, y =  y, fill = end_date)) +
+    scale_fill_viridis(na.value="white",  direction = -1) + 
+    geom_sf(data = shp, fill = NA, color = gray(.5)) +
+    geom_sf(data = dry_C, fill = NA, color = gray(.1)) + 
+    theme_bw() + 
+    labs(x = 'Longitud', y = 'Latitud', fill = 'Julian\n days', 
+         title = glue::glue('End day ({year})'))
+  
+  cd <- gridExtra::grid.arrange(c, d, ncol = 2)
+  ggsave(glue::glue('{path_out}/dates_{year}.png'), cd, 
+         width = 24, height = 6, units = "cm")
+  
+}
+
+Chirps_MSD %>% 
+  nest(-year) %>% 
+  mutate(graphs = purrr::map2(.x = year, .y = data, .f = graph_maps, path_out = path_out))
+
+
 
 # =-=-=-=-=-=-=-=-=-=-=-=
 
