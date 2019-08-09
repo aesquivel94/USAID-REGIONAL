@@ -9,6 +9,7 @@ rm(list = ls()); gc(reset = TRUE)
 # Packages. 
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 library(tidyverse)
+library(lubridate)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=- 
 
 
@@ -116,9 +117,45 @@ names_var <- do.call(rbind,str_split(na_total$station, '_')) %>%
   set_names('cod', 'names')
 
 
-
-
-catalog %>%
+catalog <- catalog %>%
   filter(national_code %in% names_var$cod) %>% 
-  names()
+  mutate(id = 1:n()) %>% 
+  # dplyr::select(Lat, Lon, nombre, national_code, Lat_1, Lon_1, ALTITUD)
+  dplyr::select(Lat, Lon, nombre, national_code, ALTITUD)
+
+
+# Join temperaturas con el catalog.
+temperatures <- temperatures %>% 
+  nest(-station) %>% 
+  mutate(station1 = station) %>% 
+  separate(station1, c('national_code', 'nombre'), '_') %>% 
+  inner_join(catalog, .) %>% 
+  dplyr::select(-nombre, -national_code)
+
+
+
+
+
+
+# Pruebas para una sola estacion... 
+
+
+library(jsonlite)
+
+lat <- 13.3
+lon <- -87.6
+json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
+json_data <- jsonlite::fromJSON(json_file)
+
+
+data_nasa <-  tibble(dates = seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")) %>%  
+  mutate(year_n = year(dates), month = month(dates), day = day(dates),
+         tmin = json_data$features$properties$parameter$T2M_MIN %>% unlist, 
+         tmax = json_data$features$properties$parameter$T2M_MAX %>% unlist) %>% 
+  na_if(-99)
+
+
+
+
+
 
