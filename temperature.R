@@ -10,6 +10,7 @@ rm(list = ls()); gc(reset = TRUE)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=-
 library(tidyverse)
 library(lubridate)
+library(jsonlite)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=- 
 
 
@@ -137,22 +138,66 @@ temperatures <- temperatures %>%
 
 
 
-# Pruebas para una sola estacion... 
+# Pruebas de NASA-power. 
 
 
-library(jsonlite)
+Nasa_download <- function(lat, lon){
+  # lat <- 13.3
+  # lon <- -87.6
+  json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
+  json_data <- jsonlite::fromJSON(json_file)
+  
+  
+  data_nasa <-  tibble(dates = seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")) %>%  
+    mutate(year = year(dates), month = month(dates), day = day(dates),
+           tmin_N = json_data$features$properties$parameter$T2M_MIN %>% unlist, 
+           tmax_N = json_data$features$properties$parameter$T2M_MAX %>% unlist) %>% 
+    na_if(-99)
+return(data_nasa)}
 
-lat <- 13.3
-lon <- -87.6
-json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
-json_data <- jsonlite::fromJSON(json_file)
+
+tictoc::tic()
+test <- temperatures %>% 
+  mutate(data_nasa = purrr::map2(.x = Lat, .y = Lon, .f = Nasa_download)) %>% 
+  mutate(join = purrr::map2(.x = data, .y = data_nasa, .f = function(x, y){
+    inner_join(x, y) %>% gather(type, value, -dates, -day, -month, -year) }))
+tictoc::toc() # 4.05 min. (only with download).
 
 
-data_nasa <-  tibble(dates = seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")) %>%  
-  mutate(year_n = year(dates), month = month(dates), day = day(dates),
-         tmin = json_data$features$properties$parameter$T2M_MIN %>% unlist, 
-         tmax = json_data$features$properties$parameter$T2M_MAX %>% unlist) %>% 
-  na_if(-99)
+
+
+test1 <- test %>% 
+  dplyr::select(-data, -data_nasa) %>%
+  unnest()
+
+
+
+ggplot(test1 , aes(dates, value, colour = type)) + 
+  geom_line() + 
+  facet_grid(~station) + 
+  theme_bw() + 
+  labs(x = '', y = 'temperature (c)', colour = '') + 
+  theme(legend.position = 'bottom')
+
+
+
+
+shp <- HM_shp <-  raster::getData('GADM', country='HN', level=1) %>% sf::st_as_sf(.) 
+dry_C <- sf::read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Honduras_Corredor_Seco.shp') 
+
+
+test <- test %>% rename( 'x' = 'Lat', 'y' = 'Lon')
+
+ggplot(test) + 
+  geom_point(aes(y, x)) +
+  theme_bw() + 
+  geom_sf(data = shp, fill = NA, color = gray(.5)) +
+  geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
+  labs(x = 'Longitud', y = 'Latitud', colour = NULL)
+
+
+
+
 
 
 
