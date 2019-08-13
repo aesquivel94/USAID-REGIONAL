@@ -199,8 +199,40 @@ ggplot(test) +
 
 
 
+# =-=-=-=-=-=-=-=-=
 
 
+library(qmap)
+
+
+a <- test %>% 
+  dplyr::select(-join) %>% 
+  mutate(join = purrr::map2(.x = data, .y = data_nasa, .f = inner_join)) %>% 
+  dplyr::select(-data, -data_nasa) %>% 
+  filter(row_number() == 1) %>% 
+  mutate(mod_tmax = map(.x = join, ~fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)), 
+         mod_tmin = map(.x = join, ~fitQmapRQUANT(.x$tmin, .x$tmin_N, qstep = 0.025, nboot = 100)))
+
+
+# a <- test %>% 
+#   filter(row_number() == 1) %>% 
+#   dplyr::select(-data, -data_nasa) %>% 
+#   unnest() %>% 
+#   dplyr::filter(type %in% c('tmax','tmax_N')) %>% 
+#   spread( type, value) %>% 
+#   nest(- x, -y, -ALTITUD, -station ) %>% 
+#   mutate(mod_tmax = map(.x = data, ~fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)))
+# 
+# a$mod_tmax
+# 
+# 
+# data(obsprecip)
+# data(modprecip)
+# 
+# qm.fit <- fitQmapRQUANT(obsprecip[,2],modprecip[,2],
+#                         qstep=0.1,nboot=10,wet.day=TRUE)
+# qm.a <- doQmapRQUANT(modprecip[,2],qm.fit,type="linear")
+# qm.b <- doQmapRQUANT(modprecip[,2],qm.fit,type="tricub")
 
 
 
