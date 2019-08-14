@@ -11,7 +11,14 @@ rm(list = ls()); gc(reset = TRUE)
 library(tidyverse)
 library(lubridate)
 library(jsonlite)
+library(qmap)
+library(sf)
 # =-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-=- 
+
+# 
+shp <- HM_shp <-  raster::getData('GADM', country='HN', level=1) %>% sf::st_as_sf(.) 
+dry_C <- sf::read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Honduras_Corredor_Seco.shp') 
+#
 
 
 # Reading max temperature. 
@@ -45,15 +52,11 @@ na_percent_min <- tmin_daily_qc %>%
 na_total <- inner_join(na_percent_max, na_percent_min, by = 'station') %>% 
   set_names(c('station', 'max_NA', 'min_NA'))
 
-
+print(na_total)
 rm(na_percent_max, na_percent_min)
 
 
 # Organizando los datos
-
-
-
-
 na_total$station
 
 tmax <- tmax_daily_qc %>% 
@@ -66,21 +69,14 @@ tmin <- tmin_daily_qc %>%
   gather(station, tmin, -day, -month, -year)
 
 temperatures <- inner_join(tmax, tmin)
-
 rm(tmin, tmax)
 
-
 # na_percent 
-temperatures %>% 
-  group_by(station) %>% 
+temperatures %>% group_by(station) %>% 
   summarise(tmax_na = sum(is.na(tmax)/n() * 100), tmin_na = sum(is.na(tmin)/n() * 100))
 
-
 # Existen temperaturas min == max. 
-temperatures %>% 
-  mutate(dif = tmax - tmin) %>% 
-  filter(dif <= 0)
-
+temperatures %>% mutate(dif = tmax - tmin) %>% filter(dif <= 0)
 
 temperatures <-temperatures %>% 
   mutate(dif = tmax - tmin, dif_cat = ifelse(dif == 0, 1, 0)) %>% 
@@ -91,33 +87,20 @@ temperatures <-temperatures %>%
   dplyr::select(-dif_cat)
 
 
-
-
 # na_percent 
-temperatures %>% 
-  group_by(station) %>% 
+temperatures %>% group_by(station) %>% 
   summarise(tmax_na = sum(is.na(tmax)/n() * 100), tmin_na = sum(is.na(tmin)/n() * 100))
 
 
-
-
 # Catalogo de datos...
-
 catalog <- read_csv('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/hnd_copeco/hnd_copeco/stations_catalog_copeco.csv')
-
-
 catalog %>% names()
 
-
-catalog$nombre
-catalog$national_code
-
-
+# =-=-=
 names_var <- do.call(rbind,str_split(na_total$station, '_')) %>% 
-  as.tibble() %>% 
-  set_names('cod', 'names')
+  as.tibble() %>% set_names('cod', 'names')
 
-
+# 
 catalog <- catalog %>%
   filter(national_code %in% names_var$cod) %>% 
   mutate(id = 1:n()) %>% 
@@ -134,24 +117,21 @@ temperatures <- temperatures %>%
   dplyr::select(-nombre, -national_code)
 
 
-
-
-
-
 # Pruebas de NASA-power. 
-
-
 Nasa_download <- function(lat, lon){
   # lat <- 13.3
   # lon <- -87.6
-  json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
+  json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,RH2M,T2M_MAX,T2M_MIN,WS2M&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
   json_data <- jsonlite::fromJSON(json_file)
   
   
   data_nasa <-  tibble(dates = seq(as.Date("1983/1/1"), as.Date(format(Sys.Date(),"%Y/%m/%d")), "days")) %>%  
     mutate(year = year(dates), month = month(dates), day = day(dates),
            tmin_N = json_data$features$properties$parameter$T2M_MIN %>% unlist, 
-           tmax_N = json_data$features$properties$parameter$T2M_MAX %>% unlist) %>% 
+           tmax_N = json_data$features$properties$parameter$T2M_MAX %>% unlist, 
+           srad_N = json_data$features$properties$parameter$ALLSKY_SFC_SW_DWN %>% unlist, 
+           rhum_N = json_data$features$properties$parameter$RH2M %>% unlist, 
+           WS_N = json_data$features$properties$parameter$WS2M %>% unlist) %>% 
     na_if(-99)
 return(data_nasa)}
 
@@ -160,40 +140,87 @@ tictoc::tic()
 test <- temperatures %>% 
   mutate(data_nasa = purrr::map2(.x = Lat, .y = Lon, .f = Nasa_download)) %>% 
   mutate(join = purrr::map2(.x = data, .y = data_nasa, .f = function(x, y){
-    inner_join(x, y) %>% gather(type, value, -dates, -day, -month, -year) }))
-tictoc::toc() # 4.05 min. (only with download).
+    inner_join(x, y) })) #  %>% gather(type, value, -dates, -day, -month, -year)
+tictoc::toc() # 3.63 min. 
 
 
-
-
-test1 <- test %>% 
-  dplyr::select(-data, -data_nasa) %>%
-  unnest()
-
-
-
-ggplot(test1 , aes(dates, value, colour = type)) + 
-  geom_line() + 
-  facet_grid(~station) + 
-  theme_bw() + 
-  labs(x = '', y = 'temperature (c)', colour = '') + 
-  theme(legend.position = 'bottom')
-
-
-
-
-shp <- HM_shp <-  raster::getData('GADM', country='HN', level=1) %>% sf::st_as_sf(.) 
-dry_C <- sf::read_sf('D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/Honduras_Corredor_Seco.shp') 
-
-
+# Graph ubicacion de las estaciones...
 test <- test %>% rename( 'x' = 'Lat', 'y' = 'Lon')
-
 ggplot(test) + 
   geom_point(aes(y, x)) +
   theme_bw() + 
   geom_sf(data = shp, fill = NA, color = gray(.5)) +
   geom_sf(data = dry_C, fill = NA, color = gray(.1)) +
   labs(x = 'Longitud', y = 'Latitud', colour = NULL)
+
+
+# Comparacion de las temperaturas... Nasa~Original. 
+data_complete <- test %>% 
+  dplyr::select(-data, -data_nasa) %>%
+  unnest() %>% 
+  dplyr::select(dates, everything())
+
+
+a <- data_complete %>%
+  dplyr::select(dates, station, tmax, tmax_N) %>% 
+  mutate(Temp = 'Tmax') %>% 
+  rename('Original' = 'tmax', 'Nasa' = 'tmax_N') %>% 
+  gather(type, value, -dates, -station, -Temp)
+  
+
+a <- data_complete %>%
+  dplyr::select(dates, station, tmin, tmin_N) %>% 
+  mutate(Temp = 'Tmin') %>% 
+  rename('Original' = 'tmin', 'Nasa' = 'tmin_N') %>% 
+  gather(type, value, -dates, -station, -Temp) %>% 
+  bind_rows(a, .)
+
+
+ggplot(a, aes(x = dates, y = value, colour = type)) + 
+  geom_line() + 
+  facet_grid(Temp~station) + 
+  theme_bw() + 
+  labs(x = NULL, y = 'Temperature', colour = NULL)
+
+
+
+
+
+
+
+b <- test %>% 
+  dplyr::select(-data, -join) %>% 
+  unnest %>% 
+  dplyr::select(station, dates, srad_N, rhum_N, WS_N) 
+
+# srad_N
+ggplot(b, aes(x = dates, y = srad_N, colour = station)) +
+  geom_line() +
+  scale_colour_viridis_d(direction = 1) +
+  theme_bw() + 
+  theme(legend.position = 'top') +
+  labs(x = NULL, y = 'Solar radiation')
+
+# rhum_N
+ggplot(b, aes(x = dates, y = rhum_N, colour = station)) +
+  geom_line() +
+  scale_colour_viridis_d(direction = 1) +
+  theme_bw() + 
+  theme(legend.position = 'top') +
+  labs(x = NULL, y = 'rhum_N')
+
+# WS_N
+ggplot(b, aes(x = dates, y = WS_N, colour = station)) +
+  geom_line() +
+  scale_colour_viridis_d(direction = 1) +
+  theme_bw() + 
+  theme(legend.position = 'top') +
+  labs(x = NULL, y = 'WS_N')
+
+
+
+
+
 
 
 
@@ -204,14 +231,22 @@ ggplot(test) +
 
 library(qmap)
 
-
+tictoc::tic()
 a <- test %>% 
   dplyr::select(-join) %>% 
   mutate(join = purrr::map2(.x = data, .y = data_nasa, .f = inner_join)) %>% 
   dplyr::select(-data, -data_nasa) %>% 
-  filter(row_number() == 1) %>% 
-  mutate(mod_tmax = map(.x = join, ~fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)), 
-         mod_tmin = map(.x = join, ~fitQmapRQUANT(.x$tmin, .x$tmin_N, qstep = 0.025, nboot = 100)))
+  mutate(mod_tmax = map(.x = join, ~qmap::fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)), 
+         mod_tmin = map(.x = join, ~qmap::fitQmapRQUANT(.x$tmin, .x$tmin_N, qstep = 0.025, nboot = 100)))
+tictoc::toc() # 2.03
+
+
+
+
+
+
+
+
 
 
 # a <- test %>% 
