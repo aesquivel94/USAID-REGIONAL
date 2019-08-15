@@ -228,42 +228,37 @@ ggplot(b, aes(x = dates, y = WS_N, colour = station)) +
 
 library(qmap)
 
+fit_Qmap <- function(data){
+  # data <- f$data[1][[1]]; var <- 'tmax'
+  # model <- qmap::fitQmapRQUANT(pull(data, !!var), pull(data, !!glue::glue('{var}_N')), qstep = 0.025, nboot = 100)
+  # forecast <- qmap::doQmapRQUANT(pull(data, !!glue::glue('{var}_N')), model, type="linear")
+  
+  model_tmax <- qmap::fitQmapRQUANT(pull(data, tmax), pull(data, tmax_N), qstep = 0.025, nboot = 100)
+  model_tmin <- qmap::fitQmapRQUANT(pull(data, tmin), pull(data, tmin_N), qstep = 0.025, nboot = 100)
+  for_tmax_l <- qmap::doQmapRQUANT(pull(data, tmax_N), model, type="linear")
+  for_tmin_l <- qmap::doQmapRQUANT(pull(data, tmin_N), model, type="linear")
+  for_tmax_t <- qmap::doQmapRQUANT(pull(data, tmax_N), model, type="tricub")
+  for_tmin_t <- qmap::doQmapRQUANT(pull(data, tmin_N), model, type="tricub")
+  
+  model_data <- data %>% 
+    dplyr::select(day, month, year, dates) %>% 
+    mutate(tmax_model = for_tmax_l, tmin_model = for_tmin_l, 
+           tmax_model_t = for_tmax_t, tmin_model_t = for_tmax_t) 
+  
+  return(model_data)}
+
 
 
 tictoc::tic()
 f <- test %>% 
-    dplyr::select(-data, -data_nasa ) %>%
+  dplyr::select(-data, -data_nasa ) %>%
   unnest() %>% 
   dplyr::na_if(-999) %>% 
   nest(-x, -y, -ALTITUD, -station) %>% 
-  mutate(mod_tmax = map(.x = data, ~qmap::fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)), 
-                  mod_tmin = map(.x = data, ~qmap::fitQmapRQUANT(.x$tmin, .x$tmin_N, qstep = 0.025, nboot = 100)))
-tictoc::toc() # 2.093 min 
+  mutate(model_data = purrr::map(.x = data, .f = fit_Qmap ))
+tictoc::toc() #  2.277 min 
 
 
-
-f$data[1][[1]] %>% pull(tmax)
-f$mod_tmax[1]
-
-qmap::doQmapRQUANT(x = f$data[1][[1]] %>% pull(tmax), f$mod_tmax[1], type="linear")
-
-
-
-
-
-f %>%
-  mutate(tmax_np = purrr::map(.x = data, ~.x %>% dplyr::select(dates, tmax_N) )) %>% 
-  mutate(for_max = purrr::map2(.x = tmax_np, .y = mod_tmax, ~qmap::doQmapRQUANT(doQmapRQUANT( .x %>% pull(tmax_N),.y, ,type="linear"))))
-
-
-
-
-
-
-
-
-
-fit_Qmap <- function()
 
 
 
