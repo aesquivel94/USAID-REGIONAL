@@ -183,14 +183,11 @@ ggplot(a, aes(x = dates, y = value, colour = type)) +
   labs(x = NULL, y = 'Temperature', colour = NULL)
 
 
-
-
-
-
-
+# Los otros graphs. 
 b <- test %>% 
   dplyr::select(-data, -join) %>% 
-  unnest %>% 
+  unnest  %>% 
+  na_if(-999) %>% 
   dplyr::select(station, dates, srad_N, rhum_N, WS_N) 
 
 # srad_N
@@ -218,7 +215,7 @@ ggplot(b, aes(x = dates, y = WS_N, colour = station)) +
   labs(x = NULL, y = 'WS_N')
 
 
-
+# Tener presente que los NA en NASA son -999, hay que hacer un cambio para que funcione correctamente.
 
 
 
@@ -231,14 +228,32 @@ ggplot(b, aes(x = dates, y = WS_N, colour = station)) +
 
 library(qmap)
 
+
+
 tictoc::tic()
-a <- test %>% 
-  dplyr::select(-join) %>% 
-  mutate(join = purrr::map2(.x = data, .y = data_nasa, .f = inner_join)) %>% 
-  dplyr::select(-data, -data_nasa) %>% 
-  mutate(mod_tmax = map(.x = join, ~qmap::fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)), 
-         mod_tmin = map(.x = join, ~qmap::fitQmapRQUANT(.x$tmin, .x$tmin_N, qstep = 0.025, nboot = 100)))
-tictoc::toc() # 2.03
+f <- test %>% 
+    dplyr::select(-data, -data_nasa ) %>%
+  unnest() %>% 
+  dplyr::na_if(-999) %>% 
+  nest(-x, -y, -ALTITUD, -station) %>% 
+  mutate(mod_tmax = map(.x = data, ~qmap::fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)), 
+                  mod_tmin = map(.x = data, ~qmap::fitQmapRQUANT(.x$tmin, .x$tmin_N, qstep = 0.025, nboot = 100)))
+tictoc::toc() # 2.093 min 
+
+
+
+f$data[1][[1]] %>% pull(tmax)
+f$mod_tmax[1]
+
+qmap::doQmapRQUANT(x = f$data[1][[1]] %>% pull(tmax), f$mod_tmax[1], type="linear")
+
+
+
+
+
+f %>%
+  mutate(tmax_np = purrr::map(.x = data, ~.x %>% dplyr::select(dates, tmax_N) )) %>% 
+  mutate(for_max = purrr::map2(.x = tmax_np, .y = mod_tmax, ~qmap::doQmapRQUANT(doQmapRQUANT( .x %>% pull(tmax_N),.y, ,type="linear"))))
 
 
 
@@ -247,6 +262,21 @@ tictoc::toc() # 2.03
 
 
 
+
+fit_Qmap <- function()
+
+
+
+
+
+# tictoc::tic()
+# a <- test %>% 
+#   dplyr::select(-join) %>% 
+#   mutate(join = purrr::map2(.x = data, .y = data_nasa, .f = inner_join)) %>% 
+#   dplyr::select(-data, -data_nasa) %>% 
+#   mutate(mod_tmax = map(.x = join, ~qmap::fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)), 
+#          mod_tmin = map(.x = join, ~qmap::fitQmapRQUANT(.x$tmin, .x$tmin_N, qstep = 0.025, nboot = 100)))
+# tictoc::toc() # 2.03
 
 
 # a <- test %>% 
