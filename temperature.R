@@ -236,14 +236,11 @@ fit_Qmap <- function(data){
   model_tmax <- qmap::fitQmapRQUANT(pull(data, tmax), pull(data, tmax_N), qstep = 0.025, nboot = 100)
   model_tmin <- qmap::fitQmapRQUANT(pull(data, tmin), pull(data, tmin_N), qstep = 0.025, nboot = 100)
   for_tmax_l <- qmap::doQmapRQUANT(pull(data, tmax_N), model_tmax, type="linear")
-  for_tmax_t <- qmap::doQmapRQUANT(pull(data, tmax_N), model_tmax, type="tricub")
   for_tmin_l <- qmap::doQmapRQUANT(pull(data, tmin_N), model_tmin, type="linear")
-  for_tmin_t <- qmap::doQmapRQUANT(pull(data, tmin_N), model_tmin, type="tricub")
   
   model_data <- data %>% 
     dplyr::select(day, month, year, dates) %>% 
-    mutate(tmax_model = for_tmax_l, tmin_model = for_tmin_l, 
-           tmax_model_t = for_tmax_t, tmin_model_t = for_tmax_t) 
+    mutate(tmax_model = for_tmax_l, tmin_model = for_tmin_l) 
   
   return(model_data)}
 
@@ -258,39 +255,104 @@ tictoc::toc() #  2.277 min
 
 
 
+# Graph...
+a <- f %>%
+  unnest() %>% 
+  dplyr::select(dates, station, tmax, tmax_N, tmax_model) %>% 
+  mutate(Temp = 'Tmax') %>% 
+  rename('Original' = 'tmax', 'Nasa' = 'tmax_N', 'Model_l' = 'tmax_model') %>% 
+  gather(type, value, -dates, -station, -Temp)
+
+
+a <- f %>%
+  unnest()  %>%
+  dplyr::select(dates, station, tmin, tmin_N, tmin_model) %>%
+  mutate(Temp = 'Tmin') %>%
+  rename('Original' = 'tmin', 'Nasa' = 'tmin_N', 'Model_l' = 'tmin_model') %>%
+  gather(type, value, -dates, -station, -Temp) %>%
+  bind_rows(a, .)
+  
+
+
+path <- 'D:/OneDrive - CGIAR/Desktop/USAID-Regional/USAID-REGIONAL/MSD_Index/to_proof_in_CPT/hnd_copeco/models_temp/'
+
+a %>% dplyr::select(station) %>% unique()  
+
+
+graph_temp <- function(x, data){
+  
+  ggplot(a %>% filter(station == as.character(x)), aes(x = dates, y = value, colour = type)) + 
+    geom_line() + 
+    scale_x_date(date_breaks = "7 year", date_labels = "%Y") + 
+    facet_grid(station~Temp) + 
+    theme_bw() + 
+    labs(x = NULL, y = 'Temperature', colour = NULL) +
+    theme(legend.position = 'bottom')
+  
+  
+  ggsave(glue::glue('{path}{x}.png'), width = 10, height = 5)
+}
+
+a %>% 
+  nest(-station) %>% 
+  mutate(ajam = purrr::map2(.x = station, .y = data, .f = graph_temp))
 
 
 
 
-# tictoc::tic()
-# a <- test %>% 
-#   dplyr::select(-join) %>% 
-#   mutate(join = purrr::map2(.x = data, .y = data_nasa, .f = inner_join)) %>% 
-#   dplyr::select(-data, -data_nasa) %>% 
-#   mutate(mod_tmax = map(.x = join, ~qmap::fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)), 
-#          mod_tmin = map(.x = join, ~qmap::fitQmapRQUANT(.x$tmin, .x$tmin_N, qstep = 0.025, nboot = 100)))
-# tictoc::toc() # 2.03
+
+data <- test %>% nest(-x, -y, -ALTITUD, -station) %>% filter(row_number() == 1) %>% .$data %>% .[[1]]
 
 
-# a <- test %>% 
-#   filter(row_number() == 1) %>% 
-#   dplyr::select(-data, -data_nasa) %>% 
-#   unnest() %>% 
-#   dplyr::filter(type %in% c('tmax','tmax_N')) %>% 
-#   spread( type, value) %>% 
-#   nest(- x, -y, -ALTITUD, -station ) %>% 
-#   mutate(mod_tmax = map(.x = data, ~fitQmapRQUANT(.x$tmax, .x$tmax_N, qstep = 0.025, nboot = 100)))
-# 
-# a$mod_tmax
-# 
-# 
-# data(obsprecip)
-# data(modprecip)
-# 
-# qm.fit <- fitQmapRQUANT(obsprecip[,2],modprecip[,2],
-#                         qstep=0.1,nboot=10,wet.day=TRUE)
-# qm.a <- doQmapRQUANT(modprecip[,2],qm.fit,type="linear")
-# qm.b <- doQmapRQUANT(modprecip[,2],qm.fit,type="tricub")
+coef <- function(data){
+
+  
+  data_to_model <- data %>% 
+    dplyr::select(join) %>% 
+    unnest()
+  
+  data_nasa <- data %>% 
+    dplyr::select(data_nasa) %>% 
+    unnest()
+  
+  
+  
+  data_obs <- data %>% 
+    dplyr::select(data) %>% 
+    unnest()
+  
+  
+  
+  data_obs
+  
+  
+  
+  
+  
+  
+  
+  
+  model <- qmap::fitQmapRQUANT(pull(data_to_model, 'tmax'), pull(data_to_model, 'tmax_N'), qstep = 0.025, nboot = 100)
+  forecast <- qmap::doQmapRQUANT(pull(data_nasa,'tmax_N') %>% na.omit(), model, type="linear")
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  # model_tmax <- qmap::fitQmapRQUANT(pull(data, tmax), pull(data, tmax_N), qstep = 0.025, nboot = 100)
+  # model_tmin <- qmap::fitQmapRQUANT(pull(data, tmin), pull(data, tmin_N), qstep = 0.025, nboot = 100)
+}
+
+
+
+
 
 
 
