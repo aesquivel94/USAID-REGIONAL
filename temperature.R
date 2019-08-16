@@ -235,10 +235,10 @@ fit_Qmap <- function(data){
   
   model_tmax <- qmap::fitQmapRQUANT(pull(data, tmax), pull(data, tmax_N), qstep = 0.025, nboot = 100)
   model_tmin <- qmap::fitQmapRQUANT(pull(data, tmin), pull(data, tmin_N), qstep = 0.025, nboot = 100)
-  for_tmax_l <- qmap::doQmapRQUANT(pull(data, tmax_N), model, type="linear")
-  for_tmin_l <- qmap::doQmapRQUANT(pull(data, tmin_N), model, type="linear")
-  for_tmax_t <- qmap::doQmapRQUANT(pull(data, tmax_N), model, type="tricub")
-  for_tmin_t <- qmap::doQmapRQUANT(pull(data, tmin_N), model, type="tricub")
+  for_tmax_l <- qmap::doQmapRQUANT(pull(data, tmax_N), model_tmax, type="linear")
+  for_tmax_t <- qmap::doQmapRQUANT(pull(data, tmax_N), model_tmax, type="tricub")
+  for_tmin_l <- qmap::doQmapRQUANT(pull(data, tmin_N), model_tmin, type="linear")
+  for_tmin_t <- qmap::doQmapRQUANT(pull(data, tmin_N), model_tmin, type="tricub")
   
   model_data <- data %>% 
     dplyr::select(day, month, year, dates) %>% 
@@ -246,8 +246,6 @@ fit_Qmap <- function(data){
            tmax_model_t = for_tmax_t, tmin_model_t = for_tmax_t) 
   
   return(model_data)}
-
-
 
 tictoc::tic()
 f <- test %>% 
