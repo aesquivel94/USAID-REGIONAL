@@ -703,15 +703,14 @@ Join_extract <- function(data, special_data, path_Chirp){
   # Extract Chirp data 
   monthly <- ifelse(month_to < 10, glue::glue('0{month_to}'), month_to)
   
-  chirp_data <- list.files(path_Chirp, full.names = TRUE) %>%
+  chirp_data <- list.files(path_Chirp, full.names = TRUE, pattern = '.tif') %>%
     stack %>% 
     raster::extract(., data.frame(x= special_data$lon,y= special_data$lat)) %>% # arreglar aqui 
     t() %>% 
     as_tibble() %>% 
     set_names('prec') %>% 
-    mutate(names = list.files(path_Chirp) %>% str_remove('.tif'), 
-           day_name = names %>% str_remove(glue::glue('chirp.{year_to}.{monthly}.')), # arreglar aqui 
-           day = as.numeric(day_name)) %>% 
+    mutate(names = list.files(path_Chirp,  pattern = '.tif') %>% str_remove('.tif'), # arreglar aqui 
+           day = names %>% str_sub(. , nchar(names) - 1, nchar(names)) %>% as.numeric()) %>% 
     dplyr::select(-names)
   
   # Join Chirp and NASA data. 
@@ -734,12 +733,9 @@ Join_extract <- function(data, special_data, path_Chirp){
 # ***** Note: This function save files.
 complete_data <-  function(path, Satellite){
   
-  post <- list.files(path = path, pattern = 'escenario_') %>% 
-    str_detect(c('max', 'min')) 
-  
   complete_data <- list.files(path = path, pattern = 'escenario_', full.names = TRUE) %>% 
     as_tibble() %>% 
-    filter(row_number() != which(post))%>% 
+    # filter(row_number() != which(post))%>% 
     mutate(data = purrr::map(.x = value, .f = read_csv), 
            complete_data = purrr::map(.x = data, .f = function(.x){bind_rows(Satellite, .x) })) %>% 
     dplyr::select(complete_data)
@@ -755,11 +751,12 @@ complete_data <-  function(path, Satellite){
 # This function save replace resampling files, summary files and escenario_a (years resampled). 
 
 # ***** Note: This function save files.
+
 function_replace <- function(data, path){
   
   replace_data <- data %>% 
     mutate(id = 1:100, 
-           path = glue::glue('{path}/escenario_{id}.csv')) 
+           path = list.files(path, pattern = '.csv')) 
   
   # Save new daily sceneries.
   walk2(.x = replace_data$complete_data, .y = replace_data$ path,
@@ -833,9 +830,8 @@ data_to_replace <- Initial_data %>%
   dplyr::select(-CPT_prob) %>% # =-=-=-= revisar desde aqui. 
   mutate(satellite_data = purrr::map2(.x = stations, .y = data, .f = Join_extract, path_output)) %>% 
   dplyr::select(-stations, -data) %>% 
-  mutate(path = paste0(path_out, names),
+  mutate(path = paste0(path_output, id), 
          complete_data = purrr::map2(.x = path, .y = satellite_data, .f = complete_data))
- # 
 
 walk2(.x = data_to_replace$complete_data, .y = data_to_replace$path, .f = function_replace)
 
