@@ -141,8 +141,8 @@ do_organize_data <- function(Season, xi, data, Intial_year, last_year){
     
   } else if(Season == 'DJF'){
     new_data <- data %>%
-      filter(month %in% c(11,12,1)) %>% 
-      mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
+      filter(month %in% c(12,1,2)) %>% 
+      mutate(year_M = ifelse(month %in% 1:2, year, year+1)) %>% 
       filter(year_M >= (Intial_year + 1), year_M < (last_year +1 ))  %>%
       group_by(year_M) %>% 
       summarise(prec = sum(prec)) %>% 
@@ -232,8 +232,8 @@ day_sample <- function(Season, cat, data, Intial_year, last_year){
     
   } else if(Season == 'DJF'){
     Daily_filter <- data %>%
-      filter(month %in% c(11,12,1)) %>% 
-      mutate(year_M = ifelse(month == 1, year, year+1)) %>% 
+      filter(month %in% c(12,1,2)) %>% 
+      mutate(year_M = ifelse(month %in% 1:2, year, year+1)) %>% 
       filter(year_M >= (Intial_year + 1), year_M < (last_year +1 ))%>%
       mutate(year = year_M - 1) %>% 
       dplyr::select(-year_M)
@@ -756,12 +756,15 @@ function_replace <- function(data, path){
   
   replace_data <- data %>% 
     mutate(id = 1:100, 
-           path = list.files(path, pattern = '.csv')) 
+           path = list.files(path, pattern = '.csv', full.names = TRUE)) 
+  
+  # file.remove(list.files(path, pattern = '.csv', full.names = TRUE))
   
   # Save new daily sceneries.
-  walk2(.x = replace_data$complete_data, .y = replace_data$ path,
+  walk2(.x = replace_data$complete_data, .y = replace_data$path,
         .f = function(.x, .y){ write_csv(x = .x, path = .y)})
 }
+
 
 # .------..------..------..------..------..------..------.
 # |R.--. ||E.--. ||S.--. ||U.--. ||L.--. ||T.--. ||S.--. |
