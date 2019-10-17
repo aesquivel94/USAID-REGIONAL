@@ -8,6 +8,30 @@ library(lubridate)
 library(rjson)
 library(raster)
 
+
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+# This function only changes the central month to season.
+# ***** INPUT 
+# *month_cent: central month of CPT's prediction.
+
+# *****  OUTPUT
+# name of season.
+central_month <- function(month_cent){
+  
+  ini_m <- str_sub(month.abb, 1, 1)
+  season <- paste0(ini_m, lead(ini_m),lead(ini_m, n = 2) )
+  # season <- glue::glue('{ini_m}{lead(ini_m)}{lead(ini_m, n = 2)}')
+  season <- case_when(season == 'NDNA' ~ 'NDJ', season == 'DNANA' ~ 'DJF', TRUE ~ as.character(season)) 
+  season <- tibble(cent = c(2:12, 1), season)
+  
+  # season_cent <- season[month_cent]
+  season_cent <- season %>% filter(cent == month_cent) %>% .$season
+  
+  return(season_cent)}
+# =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
+
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 1. Function to extract NASA POWER daily data 
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
