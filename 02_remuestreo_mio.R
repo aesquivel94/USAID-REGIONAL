@@ -35,10 +35,13 @@ library(glue)
 central_month <- function(month_cent){
   
   ini_m <- str_sub(month.abb, 1, 1)
-  season <- glue::glue('{ini_m}{lead(ini_m)}{lead(ini_m, n = 2)}')
+  season <- paste0(ini_m, lead(ini_m),lead(ini_m, n = 2) )
+  # season <- glue::glue('{ini_m}{lead(ini_m)}{lead(ini_m, n = 2)}')
   season <- case_when(season == 'NDNA' ~ 'NDJ', season == 'DNANA' ~ 'DJF', TRUE ~ as.character(season)) 
+  season <- tibble(cent = c(2:12, 1), season)
   
-  season_cent <- season[month_cent]
+  # season_cent <- season[month_cent]
+  season_cent <- season %>% filter(cent == month_cent) %>% .$season
   
   return(season_cent)}
 # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -352,7 +355,7 @@ resampling <-  function(data, CPT_prob, year_forecast){
     unnest %>%
     dplyr::select(order, year) %>% 
     nest(-order) %>%
-    spread(key = order, value = data) %>%
+    pivot_wider(names_from = order, values_from = data) %>%
     unnest %>% 
     set_names(paste0(letters[1:2], '.',  Times$Season)) %>% 
     bind_cols(id = 1:100, .)
@@ -644,7 +647,7 @@ download_data_nasa <- function(data, special_data){
   year_to <- special_data$year_to
   month_to <- special_data$month_to
   
-  
+  options(timeout=180)
   json_file <- paste0("https://power.larc.nasa.gov/cgi-bin/v1/DataAccess.py?&request=execute&identifier=SinglePoint&parameters=ALLSKY_SFC_SW_DWN,T2M_MAX,T2M_MIN&startDate=19830101&endDate=",format(Sys.Date(),"%Y%m%d"),"&userCommunity=AG&tempAverage=DAILY&outputList=ASCII&lat=",lat,"&lon=",lon)
   # Esta mostrando un error que no conozco.
   json_data <- jsonlite::fromJSON(json_file)
