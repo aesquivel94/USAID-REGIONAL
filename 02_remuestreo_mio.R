@@ -303,13 +303,16 @@ resampling <-  function(data, CPT_prob, year_forecast){
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   # 1. Fix february: depends if leap year it's true or false.
   # =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  season1 <- CPT_prob %>% dplyr::select(Season) %>% unique() %>% filter(row_number() == 1) %>% .$Season
+  
+  year_f_leap <- ifelse(season1 %in% c('ASO', 'SON', 'OND', 'NDJ', 'DJF'), year_forecast + 1, year_forecast)
   
   # Create a new data (with standard february).
   data <- data %>% 
     mutate(month_P = month) %>% 
     nest(-month_P) %>% 
     mutate(data = purrr::map_if(.x = data ,.p = month_P == 2 ,
-                                .f = change_Leap, leap_forecast = leap_year(year_forecast))) %>% 
+                                .f = change_Leap, leap_forecast = leap_year(year_f_leap))) %>% 
     dplyr::select(data) %>% 
     unnest %>% 
     arrange(year)
@@ -375,10 +378,14 @@ resampling <-  function(data, CPT_prob, year_forecast){
     mutate(data = purrr::map(.x = data, .f = function(.x){ .x  %>% unnest()})) %>%
     unnest() 
   
+  # add extra
+  months <- data_to_esc %>% dplyr::select(month) %>% unique()
+  cond_change <- isTRUE(sum(months > 7) > 0 & sum(months < 6) > 0) == TRUE
+  
   Escenaries <-  data_to_esc %>%
     mutate(year = year_forecast) %>% 
-    # mutate(year = case_when( Season %in% c('NDJ', 'DJF') & month == 1 ~ year + 1, Season == 'DJF' & month == 2 ~ year + 1, TRUE ~ year))  %>%
-    mutate(year = ifelse(Season %in% c('NDJ', 'DJF') & month == 1, year + 1, ifelse(Season == 'DJF' & month == 2, year + 1, year))) %>% 
+    mutate(year = ifelse(cond_change == TRUE & month < 6, year + 1, year))  %>%
+    # mutate(year = ifelse(Season %in% c('NDJ', 'DJF') & month == 1, year + 1, ifelse(Season == 'DJF' & month == 2, year + 1, year))) %>%
     dplyr::select(-Season) %>% 
     nest(-id) 
   
@@ -391,7 +398,9 @@ resampling <-  function(data, CPT_prob, year_forecast){
     dplyr::select(-data) %>% 
     unnest() %>% 
     unnest %>% 
-    arrange(Type) %>% 
+    arrange(Type) %>%
+    mutate(year = year_forecast) %>% 
+    mutate(year = ifelse(cond_change == TRUE & month < 6, year + 1, year)) %>% 
     dplyr::select(-Season) %>% 
     nest(-Type)
   
